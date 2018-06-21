@@ -1,0 +1,21 @@
+#!/bin/sh
+
+GITS="${HOME}/Git"
+REPOS='
+  https://github.com/godchurch/dotfiles.git
+  https://github.com/godchurch/notes.git
+  https://github.com/godchurch/random.git
+  https://github.com/godchurch/scripts.git
+  https://github.com/godchurch/setup.git
+  https://github.com/godchurch/test.git
+  https://github.com/godchurch/vm-browser.git
+'
+
+if ! [ -d "${GITS}" ]; then
+  mkdir --parent --verbose "${GITS}"
+fi
+
+for REPO in ${REPOS}; do
+  BASE="${REPO##*/}" BASE="${BASE%*.git}"
+  git clone ${REPO} ${GITS}/${BASE}
+done

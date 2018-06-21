@@ -1,0 +1,11 @@
+#!/bin/sh
+
+sudo apt-get --no-install-recommends --assume-yes install \
+  virtualbox-guest-additions-iso \
+  virtualbox-qt \
+  bleachbit \
+  keepassx \
+  make \
+  tmux \
+  git \
+  vim

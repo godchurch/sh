@@ -1,0 +1,19 @@
+#!/bin/bash
+
+while getopts ":abc:" flagOption
+do
+	echo "flag --> ${flagOption:-NULL}"
+	case ${flagOption} in
+		a|b|c)
+			echo "arg  --> ${OPTARG:-NULL}"
+			;;
+		\?)
+			echo "arg  --> ${OPTARG:-NULL}"
+			;;
+		:)
+			echo "arg  --> ${OPTARG:-NULL}"
+			;;
+	esac
+	echo '---------------'
+done
+shift "$((OPTIND -1))"

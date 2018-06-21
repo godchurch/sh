@@ -1,0 +1,37 @@
+#!/bin/sh
+
+sequence() {
+  local FIRST="$1"
+  local LAST="$2"
+
+  while [ "${FIRST}" -le "${LAST}" ]; do
+    echo "${FIRST}"
+    FIRST=$((FIRST + 1))
+  done
+}
+
+color_block() {
+  local COUNT=0
+  local START="$1"
+  local END="$2"
+  local BREAK="$3"
+
+  for COLOR in $(sequence ${START} ${END}); do
+
+    # print out color
+    printf "\033[48;5;%sm  %3s  \033[0m" "${COLOR}" "${COLOR}"
+
+    # new line at BREAK'th number && continue to next iteration
+    [ "${COUNT}" -eq "${BREAK}" ] && { COUNT=0; echo ''; continue; }
+
+    # add to count
+    COUNT=$((COUNT + 1))
+
+  done
+}
+
+color_block "0" "15" "7"
+color_block "16" "231" "5"
+color_block "232" "255" "7"
+
+exit 0
