@@ -2,13 +2,13 @@
 
 GITS="${HOME}/Git"
 REPOS='
+  https://github.com/godchurch/bash.git
+  https://github.com/godchurch/c.git
   https://github.com/godchurch/dotfiles.git
-  https://github.com/godchurch/notes.git
+  https://github.com/godchurch/py.git
   https://github.com/godchurch/random.git
-  https://github.com/godchurch/scripts.git
-  https://github.com/godchurch/setup.git
-  https://github.com/godchurch/test.git
-  https://github.com/godchurch/vm-browser.git
+  https://github.com/godchurch/sh.git
+  https://github.com/godchurch/vm.git
 '
 
 if ! [ -d "${GITS}" ]; then
