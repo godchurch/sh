@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Attribute codes:
 # 00=none 01=bold 04=underscore 05=blink 07=reverse 08=concealed
@@ -9,7 +9,7 @@
 
 for attribute in 00 01 04 05 07 08; do
 
-  case "${attribute}" in
+  case "$attribute" in
     00) printf '> none       | ' ;;
     01) printf '> bold       | ' ;;
     04) printf '> underscore | ' ;;
@@ -18,16 +18,16 @@ for attribute in 00 01 04 05 07 08; do
     08) printf '> concealed  | ' ;;
   esac
 
-  for color in {30..37}; do
-    case "${color}" in
-      30) printf "\e[${attribute};${color}m%s\e[0m " 'BLACK' ;;
-      31) printf "\e[${attribute};${color}m%s\e[0m " 'RED' ;;
-      32) printf "\e[${attribute};${color}m%s\e[0m " 'GREEN' ;;
-      33) printf "\e[${attribute};${color}m%s\e[0m " 'YELLOW' ;;
-      34) printf "\e[${attribute};${color}m%s\e[0m " 'BLUE' ;;
-      35) printf "\e[${attribute};${color}m%s\e[0m " 'MAGENTA' ;;
-      36) printf "\e[${attribute};${color}m%s\e[0m " 'CYAN' ;;
-      37) printf "\e[${attribute};${color}m%s\e[0m " 'WHITE' ;;
+  for color in 30 31 32 33 34 35 36 37; do
+    case "$color" in
+      30) printf "\033[${attribute};${color}m%s\033[0m " 'BLACK' ;;
+      31) printf "\033[${attribute};${color}m%s\033[0m " 'RED' ;;
+      32) printf "\033[${attribute};${color}m%s\033[0m " 'GREEN' ;;
+      33) printf "\033[${attribute};${color}m%s\033[0m " 'YELLOW' ;;
+      34) printf "\033[${attribute};${color}m%s\033[0m " 'BLUE' ;;
+      35) printf "\033[${attribute};${color}m%s\033[0m " 'MAGENTA' ;;
+      36) printf "\033[${attribute};${color}m%s\033[0m " 'CYAN' ;;
+      37) printf "\033[${attribute};${color}m%s\033[0m " 'WHITE' ;;
     esac
   done
 
