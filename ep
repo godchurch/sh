@@ -1,0 +1,121 @@
+#!/bin/sh
+
+test "$#" -eq 0 && exit 1
+
+default_ifs=':'
+requires_two=0
+
+unset input output input_ifs output_ifs commands
+
+while getopts ':O:b:B:rpatTfFdDeE' flag; do
+    case "$flag" in
+        O ) output="$OPTARG" ;;
+        b ) input_ifs="$OPTARG" ;;
+        B ) output_ifs="$OPTARG" ;;
+        [rpatfde] ) requires_two=1; commands="${commands}${flag}" ;;
+        [TFDE] ) commands="${commands}${flag}" ;;
+        : ) printf 'ep: option requires an argument -- %c' "$OPTARG" >&2; exit 2 ;;
+        \? ) printf 'ep: illegal option -- %c' "$OPTARG" >&2; exit 3 ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+IFS="${input_ifs:-${default_ifs}}"
+test -n "$output" && input="$*" || output="$*"
+
+if test -z "$output"; then
+    printf "ep: no arguments to create an output list" >&2
+    exit 4
+elif test "$requires_two" -eq 1 && test -z "$input"; then
+    printf "ep: action(s) require output flag to be set" >&2
+    exit 5
+fi
+
+while test "${#commands}" -gt 0; do
+    case "${commands%${commands#?}}" in
+        r )
+            shift $#
+            for i in ${output}; do
+                for j in ${input}; do
+                    test X"$i" = X"$j" && continue 2
+                done
+                set -- "$@" "$i"
+            done
+            output="$*"
+            ;;
+        p ) set -- ${input} ${output}; output="$*" ;;
+        a ) set -- ${output} ${input}; output="$*" ;;
+        t )
+            shift $#
+            for i in ${input}; do
+                for j in "$@"; do
+                    test X"$i" = X"$j" && continue 2
+                done
+            done
+            input="$*"
+            ;;
+        T )
+            shift $#
+            for i in ${output}; do
+                for j in "$@"; do
+                    test X"$i" = X"$j" && continue 2
+                done
+            done
+            output="$*"
+            ;;
+        f )
+            shift $#
+            for i in ${input}; do
+                test -f "$i" || continue 1
+                set -- "$@" "$i"
+            done
+            input="$*"
+            ;;
+        d )
+            shift $#
+            for i in ${input}; do
+                test -d "$i" || continue 1
+                set -- "$@" "$i"
+            done
+            input="$*"
+            ;;
+        e )
+            shift $#
+            for i in ${input}; do
+                test -e "$i" || continue 1
+                set -- "$@" "$i"
+            done
+            input="$*"
+            ;;
+        F )
+            shift $#
+            for i in ${output}; do
+                test -f "$i" || continue 1
+                set -- "$@" "$i"
+            done
+            output="$*"
+            ;;
+        D )
+            shift $#
+            for i in ${output}; do
+                test -d "$i" || continue 1
+                set -- "$@" "$i"
+            done
+            output="$*"
+            ;;
+        E )
+            shift $#
+            for i in ${output}; do
+                test -e "$i" || continue 1
+                set -- "$@" "$i"
+            done
+            output="$*"
+            ;;
+    esac
+    commands="${commands#?}"
+done
+
+set -- ${output}
+IFS="${output_ifs:-${IFS}}"
+
+printf '%s\n' "$*"
