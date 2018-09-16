@@ -1,21 +1,12 @@
 #!/bin/sh
 
-GITS="${HOME}/Git"
-REPOS='
-  https://github.com/godchurch/bash.git
-  https://github.com/godchurch/c.git
-  https://github.com/godchurch/dotfiles.git
-  https://github.com/godchurch/py.git
-  https://github.com/godchurch/random.git
-  https://github.com/godchurch/sh.git
-  https://github.com/godchurch/vm.git
-'
-
-if ! [ -d "${GITS}" ]; then
-  mkdir --parent --verbose "${GITS}"
+if ! hash git 2> /dev/null; then
+    printf 'E: %s\n' 'script requires git to be installed' >&2
+    exit 1
 fi
 
-for REPO in ${REPOS}; do
-  BASE="${REPO##*/}" BASE="${BASE%*.git}"
-  git clone ${REPO} ${GITS}/${BASE}
+test -d "$HOME/Git" || mkdir -pv  "$HOME/Git"
+
+for repo in c dotfiles py random sh vm; do
+  git clone "https://github.com/godchurch/${repo}.git" "$HOME/Git/$repo"
 done
