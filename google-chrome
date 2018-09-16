@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if test "$(id -u)" -eq 0; then
+if test "$(id -u)" -gt 0; then
     printf 'E: %s\n' "script needs to be run as root" >&2
     exit 1
 fi
