@@ -1,9 +1,17 @@
 #!/bin/sh
 
-if test "$(id -u)" -gt 0; then
-    printf 'E: %s\n' "script needs to be run as root" >&2
+set -e
+
+if test 0 -ne "$(id -u)"; then
+    printf '%s: script needs to be run as root\n' "${0##*/}" >&2
     exit 1
 fi
 
-wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
-printf '%s\n' 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' > /etc/apt/sources.list.d/google-chrome.list
+WEBSITE=https://dl.google.com/linux
+KEY=$WEBSITE/linux_signing_key.pub
+FILE=/etc/apt/sources.list.d/google-chrome.list
+
+STRING="deb [arch=amd64] $WEBSITE/chrome/deb/ stable main"
+
+wget -q -O - "$KEY" | apt-key add -
+printf "%s\n" "$STRING" > "$FILE"
