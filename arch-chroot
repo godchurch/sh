@@ -80,7 +80,6 @@ test "$euid" -eq 0 || die "This script must be run with root privileges\n"
 test "$#" -gt 0 || die "No chroot directory specified\n"
 
 chrootdir="$1"
-shift 1
 
 if ! mountpoint -q "$chrootdir"; then
     printf "WARNING: %s is not a mountpoint. This may have undesirable side effects.\n" "$chrootdir" 1>&2
@@ -88,8 +87,6 @@ fi
 
 chroot_setup "$chrootdir" || die "failed to setup chroot %s\n" "$chrootdir"
 chroot_add_resolv_conf "$chrootdir" || die "failed to setup resolv.conf\n"
-
-set -- "$chrootdir" "$@"
 
 if test -n "$userspec"; then
     SHELL=/bin/bash unshare --fork --pid chroot --userspec "$userspec" -- "$@"
