@@ -6,9 +6,7 @@ IFS=" 	${IFS-
 
 chroot_add_mount()
 {
-    if mount "$@"; then
-        CHROOT_ACTIVE_MOUNTS="\"$2\"${CHROOT_ACTIVE_MOUNTS:+ $CHROOT_ACTIVE_MOUNTS}"
-    fi
+    mount "$@" && CHROOT_ACTIVE_MOUNTS="\"$2\"${CHROOT_ACTIVE_MOUNTS:+ $CHROOT_ACTIVE_MOUNTS}"
 }
 
 chroot_setup()
@@ -17,19 +15,18 @@ chroot_setup()
 
     trap 'chroot_teardown' EXIT
 
-    chroot_add_mount proc "$1/proc" -t proc -o nosuid,noexec,nodev \
-        && chroot_add_mount sys "$1/sys" -t sysfs -o nosuid,noexec,nodev,ro \
-        && \
-        {
-            test -d "efivarfs/sys/firmware/efi/efivars" \
-                && chroot_add_mount efivarfs "$1/sys/firmware/efi/efivars" -t efivarfs -o nosuid,noexec,nodev 2> /dev/null
-            true
-        } \
-        && chroot_add_mount udev "$1/dev" -t devtmpfs -o mode=0755,nosuid \
-        && chroot_add_mount devpts "$1/dev/pts" -t devpts -o mode=0620,gid=5,nosuid,noexec \
-        && chroot_add_mount shm "$1/dev/shm" -t tmpfs -o mode=1777,nosuid,nodev \
-        && chroot_add_mount run "$1/run" -t tmpfs -o nosuid,nodev,mode=0755 \
-        && chroot_add_mount tmp "$1/tmp" -t tmpfs -o mode=1777,strictatime,nodev,nosuid
+    chroot_add_mount proc "$1/proc" -t proc -o nosuid,noexec,nodev || return 1
+    chroot_add_mount sys "$1/sys" -t sysfs -o nosuid,noexec,nodev,ro || return 1
+
+    if test -d "efivarfs/sys/firmware/efi/efivars"; then
+        chroot_add_mount efivarfs "$1/sys/firmware/efi/efivars" -t efivarfs -o nosuid,noexec,nodev 2> /dev/null
+    fi
+
+    chroot_add_mount udev "$1/dev" -t devtmpfs -o mode=0755,nosuid || return 1
+    chroot_add_mount devpts "$1/dev/pts" -t devpts -o mode=0620,gid=5,nosuid,noexec || return 1
+    chroot_add_mount shm "$1/dev/shm" -t tmpfs -o mode=1777,nosuid,nodev || return 1
+    chroot_add_mount run "$1/run" -t tmpfs -o nosuid,nodev,mode=0755 || return 1
+    chroot_add_mount tmp "$1/tmp" -t tmpfs -o mode=1777,strictatime,nodev,nosuid || return 1
 }
 
 chroot_teardown()
@@ -38,7 +35,6 @@ chroot_teardown()
     test "$#" -gt 0 && umount "$@"
     unset CHROOT_ACTIVE_MOUNTS
 }
-
 
 chroot_add_resolv_conf()
 {
@@ -63,58 +59,40 @@ chroot_add_resolv_conf()
     chroot_add_mount /etc/resolv.conf "$resolv_conf" --bind
 }
 
+die()
+{
+    printf "$@" 1>&2
+    exit 1
+}
+
 unset userspec
 while getopts ':u:' option; do
   case $option in
-    u)
-        userspec="$OPTARG"
-        ;;
-    :)
-        printf "%s: option requires an argument -- %c\n" "$0" "$OPTARG" 1>&2
-        exit 1
-        ;;
-    ?)
-        printf "%s: illegal option -- %c\n" "$0" "$OPTARG" 1>&2
-        exit 1
-        ;;
+    u) userspec="$OPTARG" ;;
+    :) die "%s: option requires an argument -- %c\n" "${0##*/}" "$OPTARG" ;;
+    ?) die "%s: illegal option -- %c\n" "${0##*/}" "$OPTARG" ;;
   esac
 done
 shift $((OPTIND - 1))
 
-euid="$(id -u)"
-if test "$euid" -gt 0; then
-    printf "This script must be run with root privileges\n" 1>&2
-    exit 1
-fi
-
-if test "$#" -eq 0; then
-    printf "No chroot directory specified\n" 1>&2
-    exit 1
-fi
-
-if ! mountpoint -q "$1"; then
-    printf "WARNING: %s is not a mountpoint. This may have undesirable side effects.\n" "$1" 1>&2
-fi
+euid="$(id -u 2> /dev/null)" || die "Unable to determine effective user id\n"
+test "$euid" -eq 0 || die "This script must be run with root privileges\n"
+test "$#" -gt 0 || die "No chroot directory specified\n"
 
 chrootdir="$1"
 shift 1
 
-if ! chroot_setup "$chrootdir"; then
-    printf "failed to setup chroot %s\n" "$chrootdir" 1>&2
-    exit 1
+if ! mountpoint -q "$chrootdir"; then
+    printf "WARNING: %s is not a mountpoint. This may have undesirable side effects.\n" "$chrootdir" 1>&2
 fi
 
-if ! chroot_add_resolv_conf "$chrootdir"; then
-    printf "failed to setup resolv.conf\n" 1>&2
-    exit 1
-fi
+chroot_setup "$chrootdir" || die "failed to setup chroot %s\n" "$chrootdir"
+chroot_add_resolv_conf "$chrootdir" || die "failed to setup resolv.conf\n"
+
+set -- "$chrootdir" "$@"
 
 if test -n "$userspec"; then
-    SHELL=/bin/bash \
-        unshare --fork --pid \
-        chroot --userspec $userspec -- "$chrootdir" "$@"
+    SHELL=/bin/bash unshare --fork --pid chroot --userspec "$userspec" -- "$@"
 else
-    SHELL=/bin/bash \
-        unshare --fork --pid \
-        chroot -- "$chrootdir" "$@"
+    SHELL=/bin/bash unshare --fork --pid chroot -- "$@"
 fi
