@@ -83,12 +83,12 @@ shift $((OPTIND - 1))
 
 euid="$(id -u)"
 if test "$euid" -gt 0; then
-    printf "This script must be run with root privileges\n"
+    printf "This script must be run with root privileges\n" 1>&2
     exit 1
 fi
 
 if test "$#" -eq 0; then
-    printf "No chroot directory specified\n"
+    printf "No chroot directory specified\n" 1>&2
     exit 1
 fi
 
