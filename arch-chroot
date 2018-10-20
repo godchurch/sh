@@ -1,0 +1,120 @@
+#!/bin/sh
+
+unset IFS
+IFS=" 	${IFS-
+}"
+
+chroot_add_mount()
+{
+    if mount "$@"; then
+        CHROOT_ACTIVE_MOUNTS="\"$2\"${CHROOT_ACTIVE_MOUNTS:+ $CHROOT_ACTIVE_MOUNTS}"
+    fi
+}
+
+chroot_setup()
+{
+    unset CHROOT_ACTIVE_MOUNTS
+
+    trap 'chroot_teardown' EXIT
+
+    chroot_add_mount proc "$1/proc" -t proc -o nosuid,noexec,nodev \
+        && chroot_add_mount sys "$1/sys" -t sysfs -o nosuid,noexec,nodev,ro \
+        && \
+        {
+            test -d "efivarfs/sys/firmware/efi/efivars" \
+                && chroot_add_mount efivarfs "$1/sys/firmware/efi/efivars" -t efivarfs -o nosuid,noexec,nodev 2> /dev/null
+            true
+        } \
+        && chroot_add_mount udev "$1/dev" -t devtmpfs -o mode=0755,nosuid \
+        && chroot_add_mount devpts "$1/dev/pts" -t devpts -o mode=0620,gid=5,nosuid,noexec \
+        && chroot_add_mount shm "$1/dev/shm" -t tmpfs -o mode=1777,nosuid,nodev \
+        && chroot_add_mount run "$1/run" -t tmpfs -o nosuid,nodev,mode=0755 \
+        && chroot_add_mount tmp "$1/tmp" -t tmpfs -o mode=1777,strictatime,nodev,nosuid
+}
+
+chroot_teardown()
+{
+    eval set -- $CHROOT_ACTIVE_MOUNTS
+    test "$#" -gt 0 && umount "$@"
+    unset CHROOT_ACTIVE_MOUNTS
+}
+
+
+chroot_add_resolv_conf()
+{
+    resolv_conf="$1/etc/resolv.conf"
+
+    test -e "/etc/resolv.conf" || return 0
+
+    if test -h "$chrootdir/etc/resolv.conf"; then
+        resolv_conf=$(readlink "$chrootdir/etc/resolv.conf")
+        case "$resolv_conf" in
+            /*) resolv_conf="$chrootdir$resolv_conf" ;;
+             *) resolv_conf="$chrootdir/etc/$resolv_conf" ;;
+        esac
+
+        if ! test -f "$resolv_conf"; then
+            install -Dm644 "/dev/null" "$resolv_conf" || return 1
+        fi
+    elif ! test -e "$chrootdir/etc/resolv.conf"; then
+        return 0
+    fi
+
+    chroot_add_mount /etc/resolv.conf "$resolv_conf" --bind
+}
+
+unset userspec
+while getopts ':u:' option; do
+  case $option in
+    u)
+        userspec="$OPTARG"
+        ;;
+    :)
+        printf "%s: option requires an argument -- %c\n" "$0" "$OPTARG" 1>&2
+        exit 1
+        ;;
+    ?)
+        printf "%s: illegal option -- %c\n" "$0" "$OPTARG" 1>&2
+        exit 1
+        ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+euid="$(id -u)"
+if test "$euid" -gt 0; then
+    printf "This script must be run with root privileges\n"
+    exit 1
+fi
+
+if test "$#" -eq 0; then
+    printf "No chroot directory specified\n"
+    exit 1
+fi
+
+if ! mountpoint -q "$1"; then
+    printf "WARNING: %s is not a mountpoint. This may have undesirable side effects.\n" "$1" 1>&2
+fi
+
+chrootdir="$1"
+shift 1
+
+if ! chroot_setup "$chrootdir"; then
+    printf "failed to setup chroot %s\n" "$chrootdir" 1>&2
+    exit 1
+fi
+
+if ! chroot_add_resolv_conf "$chrootdir"; then
+    printf "failed to setup resolv.conf\n" 1>&2
+    exit 1
+fi
+
+if test -n "$userspec"; then
+    SHELL=/bin/bash \
+        unshare --fork --pid \
+        chroot --userspec $userspec -- "$chrootdir" "$@"
+else
+    SHELL=/bin/bash \
+        unshare --fork --pid \
+        chroot -- "$chrootdir" "$@"
+fi
