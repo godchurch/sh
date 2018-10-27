@@ -1,2 +1,0 @@
-# sh
-bourne shell programs
