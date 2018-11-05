@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 timedatectl set-ntp true
 parted -s /dev/sda mklabel msdos mkpart primary ext4 1MiB 100% set 1 boot on
 mkfs.ext4 /dev/sda1
