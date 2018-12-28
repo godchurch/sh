@@ -1,11 +1,13 @@
 #!/bin/sh
 
 if ! hash git 2> /dev/null; then
-    printf 'E: %s\n' 'script requires git to be installed' >&2
-    exit 1
+  printf 'E: %s\n' 'script requires git to be installed' >&2
+  exit 1
 fi
 
-test -d "$HOME/Git" || mkdir -pv  "$HOME/Git"
+if ! test -d "$HOME/Git"; then
+  mkdir -pv  "$HOME/Git"
+fi
 
 for repo in c dotfiles py random sh vm; do
   git clone "https://github.com/godchurch/${repo}.git" "$HOME/Git/$repo"
