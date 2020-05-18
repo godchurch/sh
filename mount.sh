@@ -17,3 +17,10 @@ if test -d "$CHROOT"; then
   mount run    "$CHROOT/run"     -t tmpfs    -o mode=0755,nosuid,nodev
   mount tmp    "$CHROOT/tmp"     -t tmpfs    -o mode=1777,strictatime,nodev,nosuid
 fi
+
+#if ! test -f /run/systemd/resolve/stub-resolv.conf; then
+#  mkdir -p /run/systemd/resolve
+#  echo "nameserver 1.1.1.1" > /run/systemd/resolve/stub-resolv.conf
+#fi
+#
+#ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
