@@ -4,7 +4,7 @@ set -e
 TARGET="${1%/}"
 test -z "$TARGET" && { printf "Usage: %s [chroot directory]" "$0"; exit 1; }
 set -x
-mountpoint "$TARGET"; test -d "$TARGET"
+mountpoint -q "$TARGET"; test -d "$TARGET"
 mount -t proc proc "$TARGET/proc"
 mount -t sysfs sysfs "$TARGET/sys"
 mount --bind /dev "$TARGET/dev"
