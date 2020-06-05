@@ -7,11 +7,10 @@ set -x
 mountpoint "$TARGET"; test -d "$TARGET"
 mount -t proc proc "$TARGET/proc"
 mount -t sysfs sysfs "$TARGET/sys"
-mount -t tmpfs tmpfs "$TARGET/tmp"
-mount -t tmpfs run "$TARGET/run"
 mount --bind /dev "$TARGET/dev"
 
 if test -e "$TARGET/etc/resolv.conf"; then
+  mount -t tmpfs run "$TARGET/run"
   RESOLV_CONF="$TARGET/etc/resolv.conf"
   printf "%s\n" "nameserver 1.1.1.1" > "$TARGET/run/default-resolv.conf"
   if test -L "$RESOLV_CONF"; then
