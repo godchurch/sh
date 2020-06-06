@@ -16,7 +16,6 @@ if test -e "$TARGET/etc/resolv.conf" || test -L "$TARGET/etc/resolv.conf"; then
       /*) RESOLV_CONF="${TARGET}${RESOLV_CONF}" ;;
       *) RESOLV_CONF="$TARGET/etc/$RESOLV_CONF" ;;
     esac
-    RESOLV_CONF="${RESOLV_CONF%/}"
     test -f "$RESOLV_CONF" || install -Dm644 /dev/null "$RESOLV_CONF"
   fi
   mount --bind "$TARGET/run/default-resolv.conf" "$RESOLV_CONF"
