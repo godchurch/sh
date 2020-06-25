@@ -43,7 +43,7 @@ fi
 test -d "$BUILD_DIR/dev" || mkdir "$BUILD_DIR/dev"; mount --bind /dev "$BUILD_DIR/dev"
 
 DEVICE_LINE="$(blkid "$PART")"
-UUID="$(printf "%s\n" "$DEVICE_LINE" | sed 's/^.*[[:blank:]]UUID="\([^"]\{1,\}\)"[[:blank:]].*$/\1/')"
+UUID="$(printf "%s\n" "$DEVICE_LINE" | sed 's/^.*[[:blank:]]\(UUID=\)"\([^"]\{1,\}\)"[[:blank:]].*$/\1\2/')"
 TYPE="$(printf "%s\n" "$DEVICE_LINE" | sed 's/^.*[[:blank:]]TYPE="\([^"]\{1,\}\)"[[:blank:]].*$/\1/')"
 
 AWK='BEGIN{ printf "network:\n  version: 2\n  renderer: %s\n  ethernets:", "networkd" }
