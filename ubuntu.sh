@@ -18,7 +18,7 @@ EOF
 sfdisk --part-type "$DEV" 1 83
 sfdisk -A "$DEV" 1
 mkfs.ext4 "$PART"
-test -d "$BUILD_DIR" || mkdir "$BUILD_DIR"; mount "$DEV" "$BUILD_DIR"
+test -d "$BUILD_DIR" || mkdir "$BUILD_DIR"; mount "$PART" "$BUILD_DIR"
 test -z "$CODENAME" && CODENAME="$(lsb_release)"
 
 debootstrap --arch amd64 "$CODENAME" "$BUILD_DIR"
