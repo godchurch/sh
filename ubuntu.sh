@@ -126,10 +126,8 @@ _EOF
 LC_ALL=C chroot "$BUILD_DIR" /bin/sh -c '
 set -ex
 apt-get update
-apt-get install --no-install-recommends -y linux-generic grub-pc build-essential
+apt-get install -y linux-image-generic linux-headers-generic grub-pc build-essential
 apt-get dist-upgrade -y
 apt-get autoremove -y
 apt-get clean -y
 '
-set +x
-printf "%s\n" "- DONE -"
