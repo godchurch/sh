@@ -1,10 +1,10 @@
 #!/bin/sh
 
 set -ex
-GIT="https://github.com"
-GIT_PROFILE="$GIT/godchurch"
-DEST="$HOME/Documents/git"
-REPOS="base-ubuntu dotfiles random sh vm"
+
 command -v git > /dev/null
-test -d "$DEST" || mkdir -p  "$DEST"
-for REPO in $REPOS; do git clone "$GIT_PROFILE/$REPO.git" "$DEST/$REPO"; done
+
+test -d "$HOME/Documents/git" || mkdir -p  "$HOME/Documents/git"
+for i in base-ubuntu dotfiles random sh vm; do
+  git clone "https://github.com/godchurch/$i.git" "$HOME/Documents/git/$i"
+done
