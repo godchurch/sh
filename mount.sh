@@ -5,9 +5,9 @@ set -ex
 BLOCK_DEVICE="$1"
 TARGET="${2%/}"
 
-lsblk -lpno NAME | grep "^${BLOCK_DEVICE$}$"
+lsblk -lpno NAME | grep "^${BLOCK_DEVICE}$"
 test -n "$TARGET"
-mountpoint -q "$TARGET";
+! mountpoint -q "$TARGET"
 
 test -d "$TARGET" || mkdir "$TARGET"; mount "$BLOCK_DEVICE" "$TARGET"
 
