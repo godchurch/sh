@@ -12,11 +12,11 @@ BUILD_DIR="/target"
 command -v debootstrap
 command -v sfdisk
 
-sfdisk "$DEV" << EOF
+sfdisk -f "$DEV" << EOF
 2048,
 EOF
-sfdisk --part-type "$DEV" 1 83
-sfdisk -A "$DEV" 1
+sfdisk -f --part-type "$DEV" 1 83
+sfdisk -f -A "$DEV" 1
 mkfs.ext4 "$PART"
 test -d "$BUILD_DIR" || mkdir "$BUILD_DIR"; mount "$PART" "$BUILD_DIR"
 test -z "$CODENAME" && CODENAME="$(lsb_release)"
