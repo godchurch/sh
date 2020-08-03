@@ -3,14 +3,18 @@
 set -ex
 EFFECTIVE_USER_ID="$(id -u)"
 test "$EFFECTIVE_USER_ID" -eq 0
-test $# -ge 1
-DEV="$1"
-PART="${DEV}1"
-test $# -eq 2 && CODENAME="$2" || CODENAME=""
-BUILD_DIR="/target"
 
 command -v debootstrap
 command -v sfdisk
+
+test $# -ge 1
+test $# -eq 2 && CODENAME="$2" || CODENAME="$(lsb_release -sc)"
+
+DEV="$1"
+PART="${DEV}1"
+
+BUILD_DIR="/target"
+RESOLV_CONF="$BUILD_DIR/etc/resolv.conf"
 
 sfdisk -f "$DEV" << EOF
 2048,
@@ -19,7 +23,6 @@ sfdisk -f --part-type "$DEV" 1 83
 sfdisk -f -A "$DEV" 1
 mkfs.ext4 "$PART"
 test -d "$BUILD_DIR" || mkdir "$BUILD_DIR"; mount "$PART" "$BUILD_DIR"
-test -z "$CODENAME" && CODENAME="$(lsb_release -sc)"
 
 debootstrap --arch amd64 "$CODENAME" "$BUILD_DIR"
 
@@ -27,8 +30,7 @@ mkdir -p "$BUILD_DIR/proc"; mount -t proc proc "$BUILD_DIR/proc"
 mkdir -p "$BUILD_DIR/sys"; mount -t sysfs sysfs "$BUILD_DIR/sys"
 mkdir -p "$BUILD_DIR/tmp"; mount -t tmpfs tmpfs "$BUILD_DIR/tmp"
 mkdir -p "$BUILD_DIR/run"; mount -t tmpfs run "$BUILD_DIR/run"
-if test -e "$BUILD_DIR/etc/resolv.conf" || test -L "$BUILD_DIR/etc/resolv.conf"; then
-  RESOLV_CONF="$BUILD_DIR/etc/resolv.conf"
+if test -e "$RESOLV_CONF" || test -L "$RESOLV_CONF"; then
   printf "%s\n" "nameserver 1.1.1.1" > "$BUILD_DIR/run/default-resolv.conf"
   if test -L "$RESOLV_CONF"; then
     RESOLV_CONF="$(readlink "$RESOLV_CONF")"
