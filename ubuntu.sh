@@ -23,10 +23,10 @@ test -z "$CODENAME" && CODENAME="$(lsb_release -sc)"
 
 debootstrap --arch amd64 "$CODENAME" "$BUILD_DIR"
 
-test -d "$BUILD_DIR/proc" || mkdir "$BUILD_DIR/proc"; mount -t proc proc "$BUILD_DIR/proc"
-test -d "$BUILD_DIR/sys" || mkdir "$BUILD_DIR/sys"; mount -t sysfs sysfs "$BUILD_DIR/sys"
-test -d "$BUILD_DIR/tmp" || mkdir "$BUILD_DIR/tmp"; mount -t tmpfs tmpfs "$BUILD_DIR/tmp"
-test -d "$BUILD_DIR/run" || mkdir "$BUILD_DIR/run"; mount -t tmpfs run "$BUILD_DIR/run"
+mkdir -p "$BUILD_DIR/proc"; mount -t proc proc "$BUILD_DIR/proc"
+mkdir -p "$BUILD_DIR/sys"; mount -t sysfs sysfs "$BUILD_DIR/sys"
+mkdir -p "$BUILD_DIR/tmp"; mount -t tmpfs tmpfs "$BUILD_DIR/tmp"
+mkdir -p "$BUILD_DIR/run"; mount -t tmpfs run "$BUILD_DIR/run"
 if test -e "$BUILD_DIR/etc/resolv.conf" || test -L "$BUILD_DIR/etc/resolv.conf"; then
   RESOLV_CONF="$BUILD_DIR/etc/resolv.conf"
   printf "%s\n" "nameserver 1.1.1.1" > "$BUILD_DIR/run/default-resolv.conf"
@@ -40,7 +40,7 @@ if test -e "$BUILD_DIR/etc/resolv.conf" || test -L "$BUILD_DIR/etc/resolv.conf";
   fi
   mount --bind "$BUILD_DIR/run/default-resolv.conf" "$RESOLV_CONF"
 fi
-test -d "$BUILD_DIR/dev" || mkdir "$BUILD_DIR/dev"; mount --bind /dev "$BUILD_DIR/dev"
+mkdir -p "$BUILD_DIR/dev"; mount --bind /dev "$BUILD_DIR/dev"
 
 DEVICE_LINE="$(blkid "$PART")"
 UUID="$(printf "%s\n" "$DEVICE_LINE" | sed 's/^.*[[:blank:]]\(UUID=\)"\([^"]\{1,\}\)"[[:blank:]].*$/\1\2/')"
