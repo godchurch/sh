@@ -9,12 +9,12 @@ lsblk -lpno NAME | grep "^${BLOCK_DEVICE}$"
 test -n "$TARGET"
 ! mountpoint -q "$TARGET"
 
-test -d "$TARGET" || mkdir "$TARGET"; mount "$BLOCK_DEVICE" "$TARGET"
+mkdir -p "$TARGET"; mount "$BLOCK_DEVICE" "$TARGET"
 
-test -d "$TARGET/proc" || mkdir "$TARGET/proc"; mount -t proc proc "$TARGET/proc"
-test -d "$TARGET/sys" || mkdir "$TARGET/sys"; mount -t sysfs sysfs "$TARGET/sys"
-test -d "$TARGET/tmp" || mkdir "$TARGET/tmp"; mount -t tmpfs tmpfs "$TARGET/tmp"
-test -d "$TARGET/run" || mkdir "$TARGET/run"; mount -t tmpfs run "$TARGET/run"
+mkdir -p "$TARGET/proc"; mount -t proc proc "$TARGET/proc"
+mkdir -p "$TARGET/sys"; mount -t sysfs sysfs "$TARGET/sys"
+mkdir -p "$TARGET/tmp"; mount -t tmpfs tmpfs "$TARGET/tmp"
+mkdir -p "$TARGET/run"; mount -t tmpfs run "$TARGET/run"
 
 if test -e "$TARGET/etc/resolv.conf" || test -L "$TARGET/etc/resolv.conf"; then
   RESOLV_CONF="$TARGET/etc/resolv.conf"
@@ -30,7 +30,9 @@ if test -e "$TARGET/etc/resolv.conf" || test -L "$TARGET/etc/resolv.conf"; then
   mount --bind "$TARGET/tmp/default-resolv.conf.$$" "$RESOLV_CONF"
 fi
 
-test -d "$TARGET/dev" || mkdir "$TARGET/dev"; \
-  mount --bind /dev "$TARGET/dev"; mount --make-slave "$TARGET/dev"
-test -d "$TARGET/dev/pts" || mkdir "$TARGET/dev/pts"; \
-  mount --bind /dev/pts "$TARGET/dev/pts"; mount --make-slave "$TARGET/dev/pts"
+mkdir -p "$TARGET/dev"; \
+  mount --bind /dev "$TARGET/dev"; \
+  mount --make-slave "$TARGET/dev"
+mkdir -p "$TARGET/dev/pts"; \
+  mount --bind /dev/pts "$TARGET/dev/pts"; \
+  mount --make-slave "$TARGET/dev/pts"
