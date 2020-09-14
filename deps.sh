@@ -7,7 +7,8 @@ apt-get install \
   make \
   tmux \
   qemu-kvm \
-  libvirt-bin \
+  libvirt-daemon \
+  libvirt-clients \
   bridge-utils \
   virtualbox \
   virtualbox-qt \
