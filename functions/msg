@@ -1,0 +1,17 @@
+# Function: msg
+msg() {
+  # 1) NORMAL MAIN       3) WARNING MAIN       5) ERROR MAIN
+  # 2) NORMAL SECONDARY  4) WARNING SECONDARY  6) ERROR SECONDARY
+  # 0) CUSTOM
+
+  case "$1" in
+    1) __msg_fmt="$2"; shift 2; printf "==> $__msg_fmt\n" "$@" ;;
+    2) __msg_fmt="$2"; shift 2; printf "  -> $__msg_fmt\n" "$@" ;;
+    3) __msg_fmt="$2"; shift 2; printf "==> [WARNING]: $__msg_fmt\n" "$@" ;;
+    4) __msg_fmt="$2"; shift 2; printf "  -> [WARNING]: $__msg_fmt\n" "$@" ;;
+    5) __msg_fmt="$2"; shift 2; printf "==> [ERROR]: $__msg_fmt\n" "$@" ;;
+    6) __msg_fmt="$2"; shift 2; printf "  -> [ERROR]: $__msg_fmt\n" "$@" ;;
+    0) shift 1; printf "$@" ;;
+  esac
+}
+# vi: ft=sh

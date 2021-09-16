@@ -1,0 +1,70 @@
+#!/bin/sh
+
+set -e
+
+unset verbose
+while getopts ":v" flag; do
+  case "$flag" in
+    v) verbose=1 ;;
+    :) printf 'E: option requires an argument -- %c\n' "$OPTARG" >&2; exit 1 ;;
+    \?) printf 'E: illegal option -- %c\n' "$OPTARG" >&2: exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+if ! hash pulseaudio pactl 2> /dev/null; then
+  set -- 'pulseaudio' 'pactl'
+  for i in "$@"; do
+    shift
+    command -v "$i" 2>&1 > /dev/null && continue
+    set -- "$@" "$i"
+  done
+  printf "E: $0: Missing command: %s\n" "$@" >&2
+  exit 1
+elif ! pulseaudio --check; then
+  printf "E: $0: Pulseaudio is not running.\n" >&2
+  exit 1
+fi
+
+info="$(pactl info)"
+default_sink="$(printf '%s\n' "$info" \
+  | sed -n 's/^Default[[:blank:]]\{1,\}Sink:[[:blank:]]\{1,\}\(.*\)$/\1/p')"
+default_source="$(printf '%s\n' "$info" \
+  | sed -n 's/^Default[[:blank:]]\{1,\}Source:[[:blank:]]\{1,\}\(.*\)$/\1/p')"
+
+case "$1" in
+  sink)
+    test -n "$default_sink"
+
+    case "$2" in
+      up) pactl set-sink-volume "$default_sink" +5% ;;
+      down) pactl set-sink-volume "$default_sink" -5% ;;
+      mute) pactl set-sink-mute "$default_sink" toggle ;;
+      *) ;;
+    esac
+    ;;
+  source)
+    test -n "$default_source"
+
+    case "$2" in
+      up) pactl set-source-volume "$default_source" +5% ;;
+      down) pactl set-source-volume "$default_source" -5% ;;
+      mute) pactl set-source-mute "$default_source" toggle ;;
+      *) ;;
+    esac
+    ;;
+  *)
+    test -n "$default_sink"
+    test -n "$default_source"
+
+    pactl set-sink-volume "$default_sink" 50%
+    pactl set-sink-mute "$default_sink" 0
+    pactl suspend-sink "$default_sink" 0
+
+    pactl set-source-volume "$default_source" 0%
+    pactl set-source-mute "$default_source" 1
+    pactl suspend-source "$default_source" 0
+    ;;
+esac
+
+exit 0
