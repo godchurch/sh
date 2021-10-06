@@ -1,122 +1,81 @@
-# Function: mount_filesystem
-if test ! "$(id -u)" -eq 0; then
-  printf 'E: %s: %s: %s (%s)\n' 'Function' 'mount_filesystem' \
-    'Loading failed' 'Permission denied' >&2
+# Function: MountFileSystem
+
+if test "`id -u`" -ne 0; then
+  printf 'E: Function: MountFileSystem: Loading failed: Permission denied\n' >&2
   test -z "$PS1" && exit 1 || return 1
 elif ! command -v lsblk > /dev/null; then
-  printf 'E: %s: %s: %s (Missing command [%s])\n' 'Function' \
-    'mount_filesystem' 'Loading failed' 'lsblk' >&2
+  printf 'E: Function: MountFileSystem: Loading failed: Missing command -- lsblk\n' >&2
   test -z "$PS1" && exit 1 || return 1
 elif ! command -v mountpoint > /dev/null; then
-  printf 'E: %s: %s: %s (Missing command [%s])\n' 'Function' \
-    'mount_filesystem' 'Loading failed' 'mountpoint' >&2
+  printf 'E: Function: MountFileSystem: Loading failed: Missing command -- mountpoint\n' >&2
   test -z "$PS1" && exit 1 || return 1
 elif ! command -v mount > /dev/null; then
-  printf 'E: %s: %s: %s (Missing command [%s])\n' 'Function' \
-    'mount_filesystem' 'Loading failed' 'mount' >&2
+  printf 'E: Function: MountFileSystem: Loading failed: Missing command -- mount\n' >&2
   test -z "$PS1" && exit 1 || return 1
 fi
 
-___mount_filesystem_has_arguments() {
-  test "$1" -eq 2 && return 0
-  printf 'E: %s: %s: Invalid number of arguments.\n' 'Function' \
-    'mount_filesystem' >&2
-  return 1
-}
-___mount_filesystem_has_device() {
-  if lsblk -lpno NAME | grep -q "^${1}$"; then return 0; fi
-  printf 'E: %s: %s: %s not found.\n' 'Function' \
-    'mount_filesystem' "$1" >&2
-  return 1
-}
-___mount_filesystem_has_mountpoint_avaliable() {
-  if test ! -d "$1"; then
-    printf 'E: %s: %s: %s not found.\n' 'Function' \
-      'mount_filesystem' "$1" >&2
+MountFileSystem ()
+{
+  if test "$#" -ne 2; then
+    printf 'E: Function: MountFileSystem: Invalid number of arguments\n' >&2
     return 1
-  elif mountpoint -q "$1"; then
-    printf 'E: %s: %s: %s alread a mountpoint.\n' 'Function' \
-      'mount_filesystem' "$1" >&2
+  elif ! lsblk -lpndo name | grep -Fq "${1%/}"; then
+    printf 'E: Function: MountFileSystem: block device not found -- %s\n' "$1" >&2
     return 1
-  fi
-
-  return 0
-}
-
-___mount_filesystem_create_directory() {
-  if test ! -d "$1"; then
-    if ! mkdir "$1"; then
-      printf 'E: %s: %s: Unable to create %s.\n' 'Function' \
-        'mount_filesystem' "$1" >&2
-      return 1
-    fi
-  fi
-
-  return 0
-}
-___mount_filesystem_mounts() {
-  ___mount_filesystem_create_directory "$3" || return 1
-
-  if ! mount -t "$1" "$2" "$3"; then
-    printf 'E: %s: %s: Unable to mount %s.\n' 'Function' \
-      'mount_filesystem' "$3" >&2
+  elif lsblk -lpno mountpoint "${1%/}" | grep -q '/'; then
+    printf 'E: Function: MountFileSystem: block device already in use -- %s\n' "$1" >&2
+    return 1
+  elif test ! -d "$2"; then
+    printf 'E: Function: MountFileSystem: directory does not exist -- %s\n' "$2" >&2
+    return 1
+  elif mountpoint -q "$2"; then
+    printf 'E: Function: MountFileSystem: directory is already a mountpoint -- %s\n' "$2" >&2
+    return 1
+  elif ! mount "$1" "$2" 2> /dev/null; then
+    printf 'E: Function: MountFileSystem: Unable to mount %s at %s\n' "$1" "$2" >&2
     return 1
   fi
 
-  return 0
+  set -- "${2%/}" \
+    'E: Function: MountFileSystem: create mountpoint -- %s\n' \
+    'E: Function: MountFileSystem: mount filesystem -- %s\n' \
+    'E: Function: MountFileSystem: bind filesystem -- %s\n' \
+    'E: Function: MountFileSystem: make filesystem a slave -- %s\n'
+
+  test ! -d "$1/proc" && ! mkdir "$1/proc" && { printf "$2" "$1/proc" >&2; return 1; }
+    mount -t proc  proc  "$1/proc" || { printf "$3" proc  >&2; return 1; }
+  test ! -d "$1/sys"  && ! mkdir "$1/sys"  && { printf "$2" "$1/sys"  >&2; return 1; }
+    mount -t sysfs sysfs "$1/sys"  || { printf "$3" sysfs >&2; return 1; }
+  test ! -d "$1/tmp"  && ! mkdir "$1/tmp"  && { printf "$2" "$1/tmp"  >&2; return 1; }
+    mount -t tmpfs tmpfs "$1/tmp"  || { printf "$3" tmpfs >&2; return 1; }
+  test ! -d "$1/run"  && ! mkdir "$1/run"  && { printf "$2" "$1/run"  >&2; return 1; }
+    mount -t tmpfs run   "$1/run"  || { printf "$3" run   >&2; return 1; }
+
+  test ! -d "$1/dev" && ! mkdir "$1/dev" && { printf "$2" "$1/dev" >&2; return 1; }
+    mount --bind /dev  "$1/dev" 2> /dev/null || { printf "$4" /dev  >&2; return 1; }
+    mount --make-slave "$1/dev" 2> /dev/null || { printf "$5" "$1/dev" >&2; return 1; }
+  test ! -d "$1/dev/pts" && ! mkdir "$1/dev/pts" && { printf "$2" "$1/dev/pts" >&2; return 1; }
+    mount --bind /dev/pts  "$1/dev/pts" 2> /dev/null || { printf "$4" /dev/pts  >&2; return 1; }
+    mount --make-slave "$1/dev/pts" 2> /dev/null || { printf "$5" "$1/dev/pts" >&2; return 1; }
+
+  test -e "$1/etc/resolv.conf" || return 0
+
+  set -- "$1" "$1/etc/resolv.conf" "$1/run/default-resolv.conf" \
+    'E: Function: MountFileSystem: Unable to create resolve file -- %s\n'
+    'E: Function: MountFileSystem: Unable to create default resolve file -- %s\n'
+    'E: Function: MountFileSystem: Unable to bind resolve file -- %s\n'
+
+  if test -L "$2"; then
+    set -- "$1" "`readlink "$2"`"
+    case "$2" in
+      /*) set -- "$1" "${1}${2}" ;;
+      *) set -- "$1" "$1/etc/$2" ;;
+    esac
+    test -f "$2" || install -Dm644 /dev/null "$2" || { printf "$4" "$2" >&2; return 1; }
+  fi
+
+  printf 'nameserver 1.1.1.1\n' > "$3" || { printf "$5" "$3" >&2; return 1; }
+  mount --bind "$3" "$2" || { printf "$6" "$3" >&2; return 1; }
 }
-___mount_filesystem_binds() {
-  ___mount_filesystem_create_directory "$2" || return 1
 
-  if ! mount --bind "$1" "$2" 2> /dev/null; then
-    printf 'E: %s: %s: Unable to bind %s.\n' 'Function' \
-      'mount_filesystem' "$3" >&2
-    return 1
-  fi
-  if ! mount --make-slave "$2" 2> /dev/null; then
-    printf 'E: %s: %s: Unable to make slave %s.\n' 'Function' \
-      'mount_filesystem' "$3" >&2
-    return 1
-  fi
-
-  return 0
-}
-
-mount_filesystem() {
-  ___mount_filesystem_has_arguments "$#" || return 1
-  ___mount_filesystem_has_device "$1" || return 1
-  ___mount_filesystem_has_mountpoint_avaliable "$2" || return 1
-
-  if ! mount "$1" "$2" 2> /dev/null; then
-    printf 'E: %s: %s: Unable to mount %s on %s.\n' 'Function' \
-      'mount_filesystem' "$1" "$2" >&2
-    return 1
-  fi
-
-  set -- "${2%/}" ""
-
-  ___mount_filesystem_mounts proc proc "$1/proc" || return 1
-  ___mount_filesystem_mounts sysfs sysfs "$1/sys" || return 1
-  ___mount_filesystem_mounts tmpfs tmpfs "$1/tmp" || return 1
-  ___mount_filesystem_mounts tmpfs run "$1/run" || return 1
-
-  ___mount_filesystem_binds "/dev" "$1/dev" || return 1
-  ___mount_filesystem_binds "/dev/pts" "$1/dev/pts" || return 1
-
-  if test -e "$1/etc/resolv.conf" || test -L "$1/etc/resolv.conf"; then
-    set -- "$1" "$1/etc/resolv.conf"
-    printf "%s\n" "nameserver 1.1.1.1" > "$1/run/default-resolv.conf"
-    if test -L "$2"; then
-      set -- "$1" "$(readlink "$2")"
-      case "$2" in
-        /*) set -- "$1" "$1$2" ;;
-        *) set -- "$1" "$1/etc/$2" ;;
-      esac
-      test -f "$2" || install -Dm644 /dev/null "$2"
-    fi
-    mount --bind "$1/run/default-resolv.conf" "$2"
-  fi
-
-  return 0
-}
-# vi: ft=sh
+# vi: filetype=sh
