@@ -1,0 +1,126 @@
+#!/bin/sh
+
+Quit ()
+{
+	exit_status=$1 format_string="%s: $2\n"
+	shift 2
+	set -- "$format_string" "${0##*/}" "$@"
+	case $exit_status in (0) printf "$@" ;; (*) printf "$@" >&2 ;; esac
+	exit $exit_status
+}
+DeleteLeadingZero ()
+{
+	for _delete_leading_zero; do
+		eval "
+		while case \"\$$_delete_leading_zero\" in (0[0-9]*) true ;; (*) false ;; esac; do
+				$_delete_leading_zero=\${$_delete_leading_zero#0}
+		done
+		"
+	done
+}
+
+has_start="false"
+has_end="false"
+
+flag= file= dest= start= end=
+while getopts :f:d:s:e: flag; do
+	case "$flag" in
+	(f) file="$OPTARG" ;;
+	(d) dest="$OPTARG" ;;
+	(s) start="$OPTARG"; has_start="true" ;;
+	(e) end="$OPTARG"; has_end="true" ;;
+	(:) Quit 1 'option requires an argument -- %c' "$OPTARG" ;;
+	(\?) Quit 1 'illegal argument -- %c' "$OPTARG" ;;
+	esac
+done
+shift $((OPTIND - 1))
+
+test -z "$file" && Quit 1 'missing file operand'
+test -z "$dest" && Quit 1 'missing destination operand'
+
+valid_time_string='[0-9][0-9]:[0-9][0-9]'
+time_string_error='invalid %s - has to be in the form `00:00'\'
+case "${start:-00:00}" in ($valid_time_string) ;; (*) Quit 1 "$time_string_error" "start" ;; esac
+case "${end:-00:00}" in ($valid_time_string) ;; (*) Quit 1 "$time_string_error" "end" ;; esac
+
+realpath_input=$(realpath "$file" 2> /dev/null) || Quit 1 'unable to resolve the real path for input'
+realpath_output=$(realpath "$dest" 2> /dev/null) || Quit 1 'unable to resolve the real path for output directory'
+
+input_dir="${realpath_input%/*}"
+output_dir="$realpath_output"
+
+if test ! -d "$output_dir"; then
+	Quit 1 'destination operand not a directory'
+elif test "$input_dir" = "$output_dir"; then
+	Quit 1 '%s\n    %s' 'input and output can not be the same file' \
+		'Try changing the destination operand to another directory'
+fi
+
+input_file="${realpath_input##*/}"
+output_file=
+
+valid_file_string='VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4'
+case "$input_file" in ($valid_file_string) ;; (*) Quit 1 'invalid file operand' ;; esac
+test -f "$realpath_input" || Quit 1 'file operand does not exist'
+
+if $has_start && $has_end; then
+	test "$start" = "$end" && Quit 1 'specified start and end are the same'
+fi
+
+test $# -eq 0 || Quit 1 'too much arguments'
+
+file_basename_string=${input_file}
+file_basename_string=${file_basename_string#VID_}
+file_basename_string=${file_basename_string%.mp4}
+
+date_string=${file_basename_string%_*} time_string=${file_basename_string#*_}
+
+year=${date_string%????} month=${date_string#????} day=${date_string#??????}; month=${month%??}
+hour=${time_string%????} minute=${time_string#??} second=${time_string#????}; minute=${minute%??}
+
+DeleteLeadingZero month day hour minute second
+
+if $has_start; then
+	min=${start%%:*} sec=${start##*:}
+	DeleteLeadingZero min sec
+
+	min=$((min * 60))
+	start=$((min + sec))
+	second=$((second + start))
+
+	until test $second -lt 60; do second=$((second - 60)) minute=$((minute + 1)); done
+	until test $minute -lt 60; do minute=$((minute - 60)) hour=$((hour + 1)); done
+	until test $hour -lt 24; do hour=$((hour - 24)) day=$((day + 1)); done
+fi
+
+if $has_end; then
+	min=${end%%:*} sec=${end##*:}
+	DeleteLeadingZero min sec
+
+	min=$((min * 60))
+	end=$((min + sec - ${start:-0}))
+fi
+
+for _add_zero in month day hour minute second; do
+	eval "case \"\$$_add_zero\" in ([0-9]) $_add_zero=\"0\$$_add_zero\" ;; esac"
+done
+
+output_file="VID_${year}${month}${day}_${hour}${minute}${second}.mp4"
+
+input="$input_dir/$input_file"
+output="${output_dir%/}/$output_file"
+
+printf '%s\n' '' \
+	"START ----> ${start:-At beginning of file}${start:+s}" \
+	"DURATION -> ${end:-To the end of file}${end:+s}" \
+	"INPUT ----> $input" \
+	"OUTPUT ---> $output" ''
+
+start="${start:+-ss $start}"
+end="${end:+-t $end}"
+
+set -- ffmpeg -hide_banner -y $start -i "$input" -c copy -map_metadata -1 $end "$output"
+
+printf 'Do you want to run command? [Y/n]: ' >&2
+read -r REPLY
+case "$REPLY" in (''|[Yy]|[Yy][Ee][Ss]) "$@" ;; (*) printf 'ABORTING ...\n' ;; esac

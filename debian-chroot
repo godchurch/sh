@@ -1,0 +1,82 @@
+#!/bin/sh
+
+ChrootAddMount ()
+{
+	mount "$@" && active_mounts="$2${active_mounts:+:}$active_mounts"
+}
+ChrootSetup ()
+{
+	{ trap | grep -q 'EXIT$'; } && { printf 'E: (BUG) attempting to overwrite existing EXIT trap\n'; exit 1; } >&2
+
+	trap 'ChrootTeardown' EXIT
+	active_mounts=
+
+	ChrootAddMount proc "$1/proc" -t proc -o nosuid,noexec,nodev && \
+	ChrootAddMount sys "$1/sys" -t sysfs -o nosuid,noexec,nodev,ro && \
+	if test -d "$1/sys/firmware/efi/efivars"; then ChrootAddMount efivarfs "$1/sys/firmware/efi/efivars" -t efivarfs -o nosuid,noexec,nodev; else :; fi && \
+	ChrootAddMount udev "$1/dev" -t devtmpfs -o mode=0755,nosuid && \
+	ChrootAddMount devpts "$1/dev/pts" -t devpts -o mode=0620,gid=5,nosuid,noexec && \
+	ChrootAddMount shm "$1/dev/shm" -t tmpfs -o mode=1777,nosuid,nodev && \
+	ChrootAddMount /run "$1/run" --bind && \
+	ChrootAddMount tmp "$1/tmp" -t tmpfs -o mode=1777,strictatime,nodev,nosuid
+}
+ChrootTeardown ()
+{
+	test -n "$active_mounts" && { IFS=:; set -- $active_mounts; umount "$@"; }
+	unset active_mounts
+}
+ChrootAddResolve ()
+{
+	new_root="$1" resolv_conf="$1/etc/resolv.conf"
+
+	test -e "/etc/resolv.conf" || return 0
+
+	# Handle resolv.conf as a symlink to somewhere else.
+	if test -L "$new_root/etc/resolv.conf"; then
+		# readlink(1) should always give us *something* since we know at this point
+		# it's a symlink. For simplicity, ignore the case of nested symlinks.
+		resolv_conf=$(readlink "$new_root/etc/resolv.conf")
+		case "$resolv_conf" in
+			/*) resolv_conf="$new_root$resolv_conf" ;;
+			*) resolv_conf="$new_root/etc/$resolv_conf" ;;
+		esac
+
+		# ensure file exists to bind mount over
+		if test ! -f "$resolv_conf"; then
+			install -Dm644 /dev/null "$resolv_conf" || return 1
+		fi
+	elif test ! -e "$new_root/etc/resolv.conf"; then
+		# The chroot might not have a resolv.conf.
+		return 0
+	fi
+
+	ChrootAddMount /etc/resolv.conf "$resolv_conf" --bind
+}
+
+unset user_spec
+while getopts :hu: flag; do
+	case $flag in
+		h) printf 'USAGE: %s [-u user:group] new_root [command [arg]...]' "${0##*/}"; exit 0 ;;
+		u) user_spec="$OPTARG" ;;
+		:) printf 'E: option requires an argument -- %c\n' "$OPTARG" >&2; exit 1 ;;
+		?) printf 'E: invalid option -- %c\n' "$OPTARG" >&2; exit 1 ;;
+	esac
+done
+shift $((OPTIND - 1))
+
+test `id -u` -eq 0 || { printf 'E: This script must be run with root privileges\n'; exit 1; } >&2
+test $# -gt 0 || { printf 'E: No chroot directory specified\n'; exit 1; } >&2
+
+new_root="${1%/}"
+shift 1
+
+test -d "$new_root" || { printf 'E: Unable to create chroot on non-directory %s\n' "$new_root"; exit 1; } >&2
+mountpoint -q "$new_root" || printf 'W: %s is not a mountpoint. This may have undesirable side effects.\n' "$new_root" >&2
+
+ChrootSetup "$new_root" || { printf 'E: failed to setup chroot %s\n' "$new_root"; exit 1; } >&2
+ChrootAddResolve "$new_root" || { printf 'E: failed to setup resolv.conf\n'; exit 1; } >&2
+
+if test -n "$user_spec"
+then SHELL=/bin/bash unshare --fork --pid chroot --userspec="$user_spec" -- "$new_root" "$@"
+else SHELL=/bin/bash unshare --fork --pid chroot -- "$new_root" "$@"
+fi
