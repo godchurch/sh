@@ -53,7 +53,7 @@ test -n "$TYPE"
 formated_ip="$(ip link show)"
 formated_ip="$(printf '%s' "$formated_ip" | awk "$AWK")"
 
-fstab="$UUID / $TYPE errors=remount-ro 0 1
+fstab="UUID=$UUID / $TYPE errors=remount-ro 0 1
 tmpfs /tmp tmpfs nosuid,nodev 0 0"
 hostname="ubuntu"
 hosts="127.0.0.1    localhost
