@@ -116,7 +116,7 @@ deb http://security.ubuntu.com/ubuntu ${code_name}-security multiverse
 # deb-src http://security.ubuntu.com/ubuntu ${code_name}-security multiverse
 EndOfFile
 
-LC_ALL=C chroot "$build_directory" /bin/sh -c "
+LC_ALL=C debian-chroot "$build_directory" /bin/sh -c "
 set -x
 set -e
 apt-get update
@@ -125,4 +125,4 @@ apt-get dist-upgrade -y
 apt-get autoremove -y
 apt-get clean -y
 grub-install --target=i386-pc \"$device\"
-update-grub2"
+update-grub"
