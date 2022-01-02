@@ -7,28 +7,38 @@
 # Background color codes:
 # 40=black 41=red 42=green 43=yellow 44=blue 45=magenta 46=cyan 47=white
 
-for attribute in 00 01 04 05 07 08; do
-	unset major minor
-	case "$attribute" in
-		00) major='NONE      ' ;;
-		01) major='BOLD      ' ;;
-		04) major='UNDERSCORE' ;;
-		05) major='BLINK     ' ;;
-		07) major='REVERSE   ' ;;
-		08) major='CONCEALED ' ;;
+shift $#
+
+str=
+for attr in 00 01 04 05 07 08
+do
+	case "$attr" in
+	(00) set -- "$@" 'NONE'; unset attr ;;
+	(01) set -- "$@" 'BOLD' ;;
+	(04) set -- "$@" 'UNDERSCORE' ;;
+	(05) set -- "$@" 'BLINK' ;;
+	(07) set -- "$@" 'REVERSE' ;;
+	(08) set -- "$@" 'CONCEALED' ;;
 	esac
-	for color in 30 31 32 33 34 35 36 37; do
-		case "$color" in
-			30) colorString="BLACK" ;;
-			31) colorString="RED" ;;
-			32) colorString="GREEN" ;;
-			33) colorString="YELLOW" ;;
-			34) colorString="BLUE" ;;
-			35) colorString="MAGENTA" ;;
-			36) colorString="CYAN" ;;
-			37) colorString="WHITE" ;;
+
+	str="${str}%12s |"
+
+	for col in 30 31 32 33 34 35 36 37
+	do
+		case "$col" in
+		(30) set -- "$@" "BLACK" ;;
+		(31) set -- "$@" "RED" ;;
+		(32) set -- "$@" "GREEN" ;;
+		(33) set -- "$@" "YELLOW" ;;
+		(34) set -- "$@" "BLUE" ;;
+		(35) set -- "$@" "MAGENTA" ;;
+		(36) set -- "$@" "CYAN" ;;
+		(37) set -- "$@" "WHITE" ;;
 		esac
-		minor="${minor}\033[${attribute};${color}m${colorString} "
+
+		str="${str} \033[${col}${attr+;${attr}}m%s\033[0m"
 	done
-	printf "    ${major} | ${minor}\033[0m\n"
+	str="${str}\n"
 done
+
+printf "$str" "$@"
