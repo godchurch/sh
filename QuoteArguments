@@ -63,7 +63,13 @@ for string; do
 	set -- "$@" "$modified_string"
 done
 
-case "$IFS" in
-(' ') printf '%s' "$*" ;;
-(*) printf '%s\n' "$*" ;;
+case "$*" in
+('')
+	;;
+(*)
+	case "$IFS" in
+	(' ') printf '%s' "$*" ;;
+	(*) printf '%s\n' "$*" ;;
+	esac ;;
 esac
+
