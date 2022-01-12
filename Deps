@@ -11,9 +11,13 @@ exec apt-get -y install \
 	git \
 	make \
 	tmux \
+	p7zip-full \
+	p7zip-rar \
+	mpv \
 	qemu-system-x86 \
 	libvirt-daemon \
 	libvirt-clients \
+	virt-manager \
 	bridge-utils \
 	virtualbox \
 	virtualbox-qt \
