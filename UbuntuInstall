@@ -58,8 +58,8 @@ hostname="ubuntu"
 hosts="127.0.0.1    localhost
 127.0.1.1    $hostname"
 apt_sources="\
-deb http://archive.ubuntu.com/ubuntu/ ${code_name} main restricted universe miltiverse
-deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates main restricted universe miltiverse
+deb http://archive.ubuntu.com/ubuntu/ ${code_name} main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu/ ${code_name}-backports main restricted universe multiverse
 # deb http://archive.canonical.com/ubuntu ${code_name} partner
 deb http://security.ubuntu.com/ubuntu ${code_name}-security main restricted universe multiverse"
