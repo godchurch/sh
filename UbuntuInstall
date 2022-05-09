@@ -9,8 +9,7 @@ Error ()
 }
 
 effective_user_id="$(id -u 2> /dev/null)"
-effective_user_id="${effective_user_id:-1000}"
-test "$effective_user_id" -eq 0 || Error 'Permission denied'
+test "${effective_user_id:-1000}" -eq 0 || Error 'Permission denied'
 
 command -v debootstrap > /dev/null || Error 'Missing dependency -- debootstrap'
 command -v sfdisk > /dev/null || Error 'Missing dependency -- sfdisk'
@@ -41,14 +40,14 @@ mkdir -p "$build_directory"
 mount "$partition" "$build_directory"
 debootstrap --arch amd64 "$code_name" "$build_directory"
 
-AWK='BEGIN{ printf "network:\n  version: 2\n  renderer: %s\n  ethernets:", "networkd" }
-/^[0-9]+/ && $2 != "lo:" { printf "\n    %s\n      dhcp4: true", $2 }'
-
 block_device_attributes="$(blkid --probe --output export "$partition")"
 unset UUID TYPE
 eval "$block_device_attributes"
 test -n "$UUID"
 test -n "$TYPE"
+
+AWK='BEGIN{ printf "network:\n  version: 2\n  renderer: %s\n  ethernets:", "networkd" }
+/^[0-9]+/ && $2 != "lo:" { printf "\n    %s\n      dhcp4: true", $2 }'
 
 formated_ip="$(ip link show)"
 formated_ip="$(printf '%s' "$formated_ip" | awk "$AWK")"
@@ -59,17 +58,11 @@ hostname="ubuntu"
 hosts="127.0.0.1    localhost
 127.0.1.1    $hostname"
 apt_sources="\
-deb http://archive.ubuntu.com/ubuntu/ ${code_name} main restricted
-deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates main restricted
-deb http://archive.ubuntu.com/ubuntu/ ${code_name} universe
-deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates universe
-deb http://archive.ubuntu.com/ubuntu/ ${code_name} multiverse
-deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates multiverse
+deb http://archive.ubuntu.com/ubuntu/ ${code_name} main restricted universe miltiverse
+deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates main restricted universe miltiverse
 deb http://archive.ubuntu.com/ubuntu/ ${code_name}-backports main restricted universe multiverse
 # deb http://archive.canonical.com/ubuntu ${code_name} partner
-deb http://security.ubuntu.com/ubuntu ${code_name}-security main restricted
-deb http://security.ubuntu.com/ubuntu ${code_name}-security universe
-deb http://security.ubuntu.com/ubuntu ${code_name}-security multiverse"
+deb http://security.ubuntu.com/ubuntu ${code_name}-security main restricted universe multiverse"
 
 mkdir -p "$build_directory/etc/netplan"
 printf '%s\n' "$formated_ip" > "$build_directory/etc/netplan/01-netcfg.yaml"
