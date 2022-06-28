@@ -22,7 +22,7 @@ DeleteLeadingZero ()
 has_start="false"
 has_end="false"
 
-flag= file= dest= start= end=
+flag= file= dest= start= end= duration=
 while getopts :f:d:s:e: flag; do
 	case "$flag" in
 	(f) file="$OPTARG" ;;
@@ -98,7 +98,7 @@ if $has_end; then
 	DeleteLeadingZero min sec
 
 	min=$((min * 60))
-	end=$((min + sec - ${start:-0}))
+	duration=$((min + sec - ${start:-0}))
 fi
 
 for _add_zero in month day hour minute second; do
@@ -112,14 +112,14 @@ output="${output_dir%/}/$output_file"
 
 printf '%s\n' '' \
 	"START ----> ${start:-At beginning of file}${start:+s}" \
-	"DURATION -> ${end:-To the end of file}${end:+s}" \
+	"DURATION -> ${duration:-To the end of file}${duration:+s}" \
 	"INPUT ----> $input" \
 	"OUTPUT ---> $output" ''
 
 start="${start:+-ss $start}"
-end="${end:+-t $end}"
+end="${end:+-to $end}"
 
-set -- ffmpeg -hide_banner -y $start -i "$input" -c copy -map_metadata -1 $end "$output"
+set -- ffmpeg -hide_banner -y -i "$input" $start $end -c copy -map_metadata -1 -async 1 "$output"
 
 printf 'Do you want to run command? [Y/n]: ' >&2
 read -r REPLY
