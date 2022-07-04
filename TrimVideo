@@ -21,14 +21,16 @@ DeleteLeadingZero ()
 
 has_start="false"
 has_end="false"
+assume_yes="false"
 
 flag= file= dest= start= end= duration=
-while getopts :f:d:s:e: flag; do
+while getopts :f:d:s:e:y flag; do
 	case "$flag" in
 	(f) file="$OPTARG" ;;
 	(d) dest="$OPTARG" ;;
 	(s) start="$OPTARG"; has_start="true" ;;
 	(e) end="$OPTARG"; has_end="true" ;;
+	(y) assume_yes="true" ;;
 	(:) Quit 1 'option requires an argument -- %c' "$OPTARG" ;;
 	(\?) Quit 1 'illegal argument -- %c' "$OPTARG" ;;
 	esac
@@ -121,6 +123,10 @@ end="${end:+-to $end}"
 
 set -- ffmpeg -hide_banner -y -i "$input" $start $end -c copy -map_metadata -1 -async 1 "$output"
 
-printf 'Do you want to run command? [Y/n]: ' >&2
-read -r REPLY
-case "$REPLY" in (''|[Yy]|[Yy][Ee][Ss]) "$@" ;; (*) printf 'ABORTING ...\n' ;; esac
+if $assume_yes; then
+	"$@"
+else
+	printf 'Do you want to run command? [Y/n]: ' >&2
+	read -r REPLY
+	case "$REPLY" in (''|[Yy]|[Yy][Ee][Ss]) "$@" ;; (*) printf 'ABORTING ...\n' ;; esac
+fi
