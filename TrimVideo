@@ -21,15 +21,17 @@ DeleteLeadingZero ()
 
 has_start="false"
 has_end="false"
+has_rotate="false"
 assume_yes="false"
 
-flag= file= dest= start= end= duration=
-while getopts :f:d:s:e:y flag; do
+flag= file= dest= start= end= rotate= duration=
+while getopts :f:d:s:e:r:y flag; do
 	case "$flag" in
 	(f) file="$OPTARG" ;;
 	(d) dest="$OPTARG" ;;
 	(s) start="$OPTARG"; has_start="true" ;;
 	(e) end="$OPTARG"; has_end="true" ;;
+	(r) rotate="$OPTARG"; has_rotate="true" ;;
 	(y) assume_yes="true" ;;
 	(:) Quit 1 'option requires an argument -- %c' "$OPTARG" ;;
 	(\?) Quit 1 'illegal argument -- %c' "$OPTARG" ;;
@@ -67,6 +69,14 @@ test -f "$realpath_input" || Quit 1 'file operand does not exist'
 
 if $has_start && $has_end; then
 	test "$start" = "$end" && Quit 1 'specified start and end are the same'
+fi
+
+if $has_rotate; then
+	case "$rotate" in
+		(''|[0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
+		(*) Quit 1 'invalid rotation operand' ;;
+	esac
+	rotate="-metadata:s:v rotate=${rotate}"
 fi
 
 test $# -eq 0 || Quit 1 'too much arguments'
@@ -121,7 +131,7 @@ printf '%s\n' '' \
 start="${start:+-ss $start}"
 end="${end:+-to $end}"
 
-set -- ffmpeg -hide_banner -y -i "$input" $start $end -c copy -map_metadata -1 -async 1 "$output"
+set -- ffmpeg -hide_banner -y -i "$input" $start $end -c copy -map_metadata -1  $rotate -async 1 "$output"
 
 if $assume_yes; then
 	"$@"
