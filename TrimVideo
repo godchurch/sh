@@ -1,142 +1,191 @@
 #!/bin/sh
 
-Quit ()
-{
-	exit_status=$1 format_string="%s: $2\n"
-	shift 2
-	set -- "$format_string" "${0##*/}" "$@"
-	case $exit_status in (0) printf "$@" ;; (*) printf "$@" >&2 ;; esac
-	exit $exit_status
-}
-DeleteLeadingZero ()
-{
-	for _delete_leading_zero; do
-		eval "
-		while case \"\$$_delete_leading_zero\" in (0[0-9]*) true ;; (*) false ;; esac; do
-				$_delete_leading_zero=\${$_delete_leading_zero#0}
-		done
-		"
-	done
-}
+readonly PROGRAM="${0##*/}" SPACE=' ' TAB='	' NL='
+'
+readonly DEFAULT_IFS="${SPACE}${TAB}${NL}"
 
-has_start="false"
-has_end="false"
-has_rotate="false"
-assume_yes="false"
+IFS="$DEFAULT_IFS"
 
-flag= file= dest= start= end= rotate= duration=
-while getopts :f:d:s:e:r:y flag; do
-	case "$flag" in
-	(f) file="$OPTARG" ;;
-	(d) dest="$OPTARG" ;;
-	(s) start="$OPTARG"; has_start="true" ;;
-	(e) end="$OPTARG"; has_end="true" ;;
-	(r) rotate="$OPTARG"; has_rotate="true" ;;
-	(y) assume_yes="true" ;;
-	(:) Quit 1 'option requires an argument -- %c' "$OPTARG" ;;
-	(\?) Quit 1 'illegal argument -- %c' "$OPTARG" ;;
+Error() { printf "$@" >&2; exit 1; }
+
+input_file=
+start_position=
+end_position=
+rotate_video=
+assume_yes=
+while getopts ':i:s:t:r:y' user_input
+do
+	case "$user_input" in
+		(i) input_file="${OPTARG:-NULL}" ;;
+		(s) start_position="${OPTARG:-NULL}";;
+		(t) end_position="${OPTARG:-NULL}";;
+		(r) rotate_video="${OPTARG:-NULL}" ;;
+		(y) assume_yes="true" ;;
+		(:) Error '%s: option requires an argument -- %c\n' "$PROGRAM" "$OPTARG" ;;
+		(\?) Error '%s: illegal argument -- %c\n' "$PROGRAM" "$OPTARG" ;;
 	esac
 done
 shift $((OPTIND - 1))
 
-test -z "$file" && Quit 1 'missing file operand'
-test -z "$dest" && Quit 1 'missing destination operand'
+case $# in
+	(0)
+		output_directory="$(pwd)"
+		;;
+	(1)
+		test -n "$1" || Error '%s: directory operand cannot be a empty string\n' "$PROGRAM"
+		test -d "$1" || Error '%s: directory does not exist or is not a directory\n' "$PROGRAM"
 
-valid_time_string='[0-9][0-9]:[0-9][0-9]'
-time_string_error='invalid %s - has to be in the form `00:00'\'
-case "${start:-00:00}" in ($valid_time_string) ;; (*) Quit 1 "$time_string_error" "start" ;; esac
-case "${end:-00:00}" in ($valid_time_string) ;; (*) Quit 1 "$time_string_error" "end" ;; esac
+		output_directory="$(cd "$1" 2> /dev/null && pwd)" \
+			|| Error '%s: permission denied for specified directory\n' "$PROGRAM"
+		;;
+	(*)
+		Error '%s: too many directory operands\n' "$PROGRAM"
+		;;
 
-realpath_input=$(realpath "$file" 2> /dev/null) || Quit 1 'unable to resolve the real path for input'
-realpath_output=$(realpath "$dest" 2> /dev/null) || Quit 1 'unable to resolve the real path for output directory'
+esac
 
-input_dir="${realpath_input%/*}"
-output_dir="$realpath_output"
+output_directory="${output_directory%/}"
 
-if test ! -d "$output_dir"; then
-	Quit 1 'destination operand not a directory'
-elif test "$input_dir" = "$output_dir"; then
-	Quit 1 '%s\n    %s' 'input and output can not be the same file' \
-		'Try changing the destination operand to another directory'
+test -n "$input_file" || Error '%s: missing file argument\n' "$PROGRAM"
+test "$input_file" != "NULL" || Error '%s: file argument cannot be a empty string\n' "$PROGRAM"
+test -f "$input_file" || Error '%s: file operand does not exist or is not a regular file\n' "$PROGRAM"
+
+case "$input_file" in
+	(/*) ;;
+	(./*) input_file="$(pwd)/${input_file#*\./}" ;;
+	(*) input_file="$(pwd)/${input_file}" ;;
+esac
+
+if test "${input_file%/*}" = "$output_directory"; then
+	Error '%s: input and output can not be in the same dirctory\n' "$PROGRAM"
 fi
 
-input_file="${realpath_input##*/}"
-output_file=
+input_directory="${input_file%/*}" input_file="${input_file##*/}"
 
-valid_file_string='VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4'
-case "$input_file" in ($valid_file_string) ;; (*) Quit 1 'invalid file operand' ;; esac
-test -f "$realpath_input" || Quit 1 'file operand does not exist'
+case "$input_file" in
+	(VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4) ;;
+	(*) Error '%s: invalid file operand\n' "$PROGRAM" ;;
+esac
 
-if $has_start && $has_end; then
-	test "$start" = "$end" && Quit 1 'specified start and end are the same'
-fi
+file_date_time=${input_file}
+file_date_time=${file_date_time#VID_}
+file_date_time=${file_date_time%.mp4}
+file_date=${file_date_time%_*} file_time=${file_date_time#*_}
 
-if $has_rotate; then
-	case "$rotate" in
-		(''|[0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
-		(*) Quit 1 'invalid rotation operand' ;;
-	esac
-	rotate="-metadata:s:v rotate=${rotate}"
-fi
+year=${file_date%????} month=${file_date#????} day=${file_date#??????}; month=${month%??}
+hour=${file_time%????} minute=${file_time#??} second=${file_time#????}; minute=${minute%??}
 
-test $# -eq 0 || Quit 1 'too much arguments'
+month=${month#0} day=${day#0} hour=${hour#0} minute=${minute#0} second=${second#0}
 
-file_basename_string=${input_file}
-file_basename_string=${file_basename_string#VID_}
-file_basename_string=${file_basename_string%.mp4}
+case "$rotate_video" in
+	('') unset rotate_video ;;
+	(NULL) rotate_video= ;;
+	([0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
+	(*) Error '%s: invalid rotation operand\n' "$PROGRAM" ;;
+esac
 
-date_string=${file_basename_string%_*} time_string=${file_basename_string#*_}
+case "$start_position" in
+	('')
+		unset start_position start_display
+		;;
+	([0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9])
+		IFS=:; set -- $start_position
+		IFS="$DEFAULT_IFS"
 
-year=${date_string%????} month=${date_string#????} day=${date_string#??????}; month=${month%??}
-hour=${time_string%????} minute=${time_string#??} second=${time_string#????}; minute=${minute%??}
+		case $# in
+			(1)
+				start_minute=0 start_second="$1"
+				start_second="${start_second#0}"
+				;;
+			(2)
+				start_minute="$1" start_second="$2"
+				start_minute="${start_minute#0}" start_second="${start_second#0}"
+				;;
+		esac
 
-DeleteLeadingZero month day hour minute second
+		start_minute="$((start_minute * 60))"
+		start_time="$((start_minute + start_second))"
+		second="$((second + start_time))"
 
-if $has_start; then
-	min=${start%%:*} sec=${start##*:}
-	DeleteLeadingZero min sec
+		until test $second -lt 60; do second="$((second - 60))" minute="$((minute + 1))"; done
+		until test $minute -lt 60; do minute="$((minute - 60))" hour="$((hour + 1))"; done
+		until test $hour -lt 24; do hour="$((hour - 24))" day="$((day + 1))"; done
 
-	min=$((min * 60))
-	start=$((min + sec))
-	second=$((second + start))
+		case "$start_position" in
+			([0-9]|[0-9][0-9]) start_display="${start_position}s" ;;
+			([0-9][0-9]:[0-9][0-9]) start_display="${start_position}" ;;
+		esac
+		;;
+	(*)
+		Error '%s: invalid start argument (hint: <MM>:<SS> or <SS>)\n' "$PROGRAM"
+		;;
+esac
 
-	until test $second -lt 60; do second=$((second - 60)) minute=$((minute + 1)); done
-	until test $minute -lt 60; do minute=$((minute - 60)) hour=$((hour + 1)); done
-	until test $hour -lt 24; do hour=$((hour - 24)) day=$((day + 1)); done
-fi
+case "$end_position" in
+	('')
+		unset end_position duration_time end_display
+		;;
+	([0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9])
+		IFS=:; set -- $end_position
+		IFS="$DEFAULT_IFS"
 
-if $has_end; then
-	min=${end%%:*} sec=${end##*:}
-	DeleteLeadingZero min sec
+		case $# in
+			(1)
+				end_minute=0 end_second="$1"
+				end_second="${end_second#0}"
+				;;
+			(2)
+				end_minute="$1" end_second="$2"
+				end_minute="${end_minute#0}" end_second="${end_second#0}"
+				;;
+		esac
 
-	min=$((min * 60))
-	duration=$((min + sec - ${start:-0}))
-fi
 
-for _add_zero in month day hour minute second; do
-	eval "case \"\$$_add_zero\" in ([0-9]) $_add_zero=\"0\$$_add_zero\" ;; esac"
-done
+		end_minute="$((end_minute * 60))"
+		duration_time="$((end_minute + end_second - ${start_time:-0}))"
 
-output_file="VID_${year}${month}${day}_${hour}${minute}${second}.mp4"
+		case "$end_position" in
+			([0-9]|[0-9][0-9]) end_display="${end_position}s" ;;
+			([0-9][0-9]:[0-9][0-9]) end_display="${end_position}" ;;
+		esac
+		;;
+	(*)
+		Error '%s: invalid end argument (hint: <MM>:<SS> or <SS>)\n' "$PROGRAM"
+		;;
+esac
 
-input="$input_dir/$input_file"
-output="${output_dir%/}/$output_file"
+case "$month" in ([0-9]) month="0${month}" ;; esac
+case "$day" in ([0-9]) day="0${day}" ;; esac
+case "$hour" in ([0-9]) hour="0${hour}" ;; esac
+case "$minute" in ([0-9]) minute="0${minute}" ;; esac
+case "$second" in ([0-9]) second="0${second}" ;; esac
 
-printf '%s\n' '' \
-	"START ----> ${start:-At beginning of file}${start:+s}" \
-	"DURATION -> ${duration:-To the end of file}${duration:+s}" \
-	"INPUT ----> $input" \
-	"OUTPUT ---> $output" ''
+input_file="$input_directory/$input_file"
+output_file="${output_directory%/}/VID_${year}${month}${day}_${hour}${minute}${second}.mp4"
 
-start="${start:+-ss $start}"
-end="${end:+-to $end}"
+printf '\n%8s: %s' "Input" "$input_file" "Output" "$output_file"
 
-set -- ffmpeg -hide_banner -y -i "$input" $start $end -c copy -map_metadata -1  $rotate -async 1 "$output"
-
-if $assume_yes; then
-	"$@"
+if test -n "$start_display" && test -n "$end_display"; then
+	printf '\n%8s: %-10s%s: %s (%ss)\n\n' "Start" "$start_display" "End" "$end_display" "$duration_time"
+elif test -n "$start_display"; then
+	printf '\n%8s: %s\n\n' "Start" "$start_display"
+elif test -n "$end_display"; then
+	printf '\n%8s: %s\n\n' "End" "$end_display"
 else
-	printf 'Do you want to run command? [Y/n]: ' >&2
-	read -r REPLY
-	case "$REPLY" in (''|[Yy]|[Yy][Ee][Ss]) "$@" ;; (*) printf 'ABORTING ...\n' ;; esac
+	printf '\n\n'
 fi
+
+set -- ffmpeg \
+	-loglevel warning -stats \
+	${assume_yes:+-y} -i "$input_file" \
+	${start_position:+-ss $start_position} \
+	${end_position:+-to $end_position} \
+	-c copy -map_metadata -1  \
+	${rotate_video+-metadata:s:v rotate=$rotate_video} \
+	-async 1 "$output_file"
+
+test -n "$assume_yes" && exec "$@"
+
+printf 'Do you want to run command? [Y/n]: ' >&2
+read -r user_input
+case "$user_input" in (''|[Yy]|[Yy][Ee][Ss]) exec "$@" ;; esac
