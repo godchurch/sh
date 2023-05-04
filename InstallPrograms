@@ -7,7 +7,7 @@ fi
 
 exec apt-get -y install \
 	tmux \
-	vim \
+	neovim \
 	curl \
 	git \
 	make \
