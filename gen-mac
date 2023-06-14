@@ -1,0 +1,3 @@
+#!/bin/sh
+
+strings -n 1 /dev/urandom | grep '^[A-F0-9]$' | head -n 12 | xargs -E "" printf "%s%s-%s%s-%s%s-%s%s-%s%s-%s%s\n"
