@@ -1,14 +1,17 @@
 #!/bin/sh
 
-USAGE="Usage: ${0##*/} [-d directory] link
-       ${0##*/} -s
-       ${0##*/} -h"
+error () { printf "%s: %s\n" "${0##*/}" "$*" >&2; exit 1; }
 
-DOWNLOAD_DIR=
+command -v yt-dlp > /dev/null || error "program 'yt-dlp' not found, please install it"
+command -v ffmpeg > /dev/null || error "program 'ffmpeg' not found, please install it"
+
 while getopts :hsd: OPTION; do
     case "$OPTION" in
         (h)
-            printf "%s\n" "$USAGE"; exit 0
+            printf "%5s: %s [-d directory] link\n" "USAGE" "${0##*/}"
+            printf "%5s  %s -s\n" "" "${0##*/}"
+            printf "%5s  %s -h\n" "" "${0##*/}"
+            exit 0
             ;;
         (s)
             if [ -f ~/.local/share/dws/links.txt ]; then
@@ -16,87 +19,27 @@ while getopts :hsd: OPTION; do
             elif [ -f /usr/local/share/dws/links.txt ];then
                 cat /usr/local/share/dws/links.txt; exit
             else
-                printf "E: missing links file\n" >&2; exit 1
+                error "missing links file"
             fi
             ;;
         (d)
-            if [ ! -d "$OPTARG" ]; then
-                printf "E: directory (%s) doesn't exist\n" "$OPTARG" >&2; exit 1
-            elif [ ! -w "$OPTARG" ]; then
-                printf "E: write permision denied (%s)\n" "$OPTARG" >&2; exit 1
-            else
-                DOWNLOAD_DIR="${OPTARG%/}/${0##*/}"
-            fi
+            [ -d "$OPTARG" ] || error "directory ($OPTARG) doesn't exist"
+            cd "$OPTARG" || exit
             ;;
         (:)
-            printf "E: option requires an argument -- %c\n" "$OPTARG" >&2; exit 1
+            error "option requires an argument -- $OPTARG"
             ;;
         (?)
-            printf "E: illegal option -- %c\n" "$OPTARG" >&2; exit 1
+            error "illegal option -- $OPTARG"
             ;;
     esac
 done
 shift $((OPTIND - 1))
 
+[ $# -eq 0 ] && error "missing link operand"
+[ $# -ge 2 ] && error "restricted to only one link"
+[ -w "$PWD" ] || error "write permision denied for current directory"
 
-case $# in
-    (0)
-        printf "%s\n" "$USAGE" >&2; exit 1
-        ;;
-    (1)
-        if [ -z "$DOWNLOAD_DIR" ]; then
-            if [ ! -w "$PWD" ]; then
-                printf "E: write permision denied for current directory\n" >&2; exit 1
-            fi
-            DOWNLOAD_DIR="${0##*/}"
-        fi
-        ;;
-    (*)
-        printf "E: restricted to only one link\n" >&2; exit 1
-        ;;
-esac
-
-
-URL="${1%/}"
-case "$URL" in
-    (*://*) URL="${URL#*://}" ;;
-    (*) ;; # url does not have a scheme
-esac
-case "$URL" in
-    (*/*) BASENAME="${URL%%/*}" DIR="${URL##*/}" ;;
-    (*) printf "E: url needs to have a path\n" >&2; exit 1 ;;
-esac
-case "$BASENAME" in
-    (*.*.*) BASENAME="${BASENAME#*.}"; BASENAME="${BASENAME%.*}" ;;
-    (*.*) BASENAME="${BASENAME%.*}" ;;
-    (*) printf "E: invalid url\n" >&2; exit 1 ;;
-esac
-case "$DIR" in
-    (*\?*) DIR="${DIR%%\?*}" ;;
-    (*) ;; # path does not have a query
-esac
-URL="${1%/}"
-
-
-for i in yt-dlp ffmpeg curl aria2c; do
-    if ! command -v "$i" > /dev/null; then
-        printf "E: program \"%s\" not found, please install it\n" "$i" >&2; exit 1
-    fi
-done
-
-
-DOWNLOAD_LINK="$(yt-dlp --print urls "$URL")" || exit
-if [ -z "$DOWNLOAD_LINK" ]; then printf "E: \"%s\" is not a valid URL\n" "$URL" >&2; exit 1; fi
-OUTPUT_FILE=$(date "+VID_%Y%m%d_%H%M%S.mp4") || exit
-if [ -z "$OUTPUT_FILE" ]; then printf "E: failed to generate file name\n" >&2; exit 1; fi
-DOWNLOAD_DIR="$DOWNLOAD_DIR/$BASENAME/$DIR"
-mkdir -p "$DOWNLOAD_DIR" || exit
-
-
-if printf "%s" "$DOWNLOAD_LINK" | grep -q 'm3u8' || curl -s -m 5 "$DOWNLOAD_LINK" | grep -q '^#EXTM3U'; then
-    exec ffmpeg -loglevel warning -stats -i "$DOWNLOAD_LINK" -c copy  -map_metadata -1 -metadata comment="$URL" "$DOWNLOAD_DIR/$OUTPUT_FILE"
-elif uname -a | grep -q "ish"; then
-    exec curl --output-dir "$DOWNLOAD_DIR" -o "$OUTPUT_FILE" "$DOWNLOAD_LINK"
-else
-    exec aria2c --enable-rpc=false --check-certificate=false --continue --summary-interval=0 -x 16 -s 16 "$DOWNLOAD_LINK" --dir="$DOWNLOAD_DIR" -o "$OUTPUT_FILE" --download-result=h
-fi
+exec yt-dlp --embed-metadata \
+    --downloader ffmpeg --downloader-args ffmpeg_i:"-loglevel error -stats" \
+    -o "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$1"
