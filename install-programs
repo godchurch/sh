@@ -1,16 +1,35 @@
-#!/bin/sh
+#!/bin/bash
 
-if [ "$(id -u)" -ne 0 ]; then
+if (( "$EUID" > 0 )); then
     printf "E: Permission denied\n" >&2
     exit 1
 fi
 
-shift $#
+CLI=(neovim
+     tmux
+     git
+     make
+     m4
+     ffmpeg
+     curl)
 
-set -- "$@" neovim tmux git make m4 ffmpeg curl                   # cli
-set -- "$@" p7zip p7zip-full unar                                 # archive
-set -- "$@" mpv keepassxc gimp                                    # gui
-set -- "$@" qemu-system-x86 libvirt-daemon libvirt-clients        # virtual
-set -- "$@" virt-manager bridge-utils
+GUI=(mpv
+     keepassxc
+     gimp)
 
-exec apt-get -y install "$@"
+ARCHIVE=(p7zip
+         p7zip-full
+         unar)
+
+VIRTUAL=(qemu-system-x86
+         libvirt-daemon
+         libvirt-clients
+         virt-manager
+         bridge-utils)
+
+PROGRAMS=("${CLI[@]}"
+          "${GUI[@]}"
+          "${ARCHIVE[@]}"
+          "${VIRTUAL[@]}")
+
+exec apt-get --assume-yes install "${PROGRAMS[@]}"
