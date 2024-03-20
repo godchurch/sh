@@ -5,6 +5,8 @@ if (( "$EUID" > 0 )); then
     exit 1
 fi
 
+set -e
+
 CLI=(neovim
      tmux
      git
@@ -15,7 +17,8 @@ CLI=(neovim
 
 GUI=(mpv
      keepassxc
-     gimp)
+     gimp
+     audacity)
 
 ARCHIVE=(p7zip
          p7zip-full
@@ -32,4 +35,9 @@ PROGRAMS=("${CLI[@]}"
           "${ARCHIVE[@]}"
           "${VIRTUAL[@]}")
 
-exec apt-get --assume-yes install "${PROGRAMS[@]}"
+SNAP=(freecad
+      multipass
+      prusa-slicer)
+
+apt-get --assume-yes install "${PROGRAMS[@]}"
+snap install "${SNAP[@]}"

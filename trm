@@ -77,10 +77,10 @@ case "$SECOND" in (0[0-9]) SECOND="${SECOND#0}" ;; esac
 if [ -n "$ROTATE" ]; then
     case "$ROTATE" in
         ([0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360)
-            ROTATE="-metadata:s:v rotate=$ROTATE"
+            ROTATE="-metadata:s:v:0 rotate=$ROTATE"
             ;;
         (NULL)
-            ROTATE="-metadata:s:v rotate="
+            ROTATE="-metadata:s:v:0 rotate="
             ;;
         (*) error "invalid rotation operand"
             ;;
