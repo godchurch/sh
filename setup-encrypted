@@ -1,75 +1,105 @@
 #!/bin/sh
+
+# ORIGINAL FROM
 # https://help.ubuntu.com/community/Full_Disk_Encryption_Howto_2019
 
-set -x
 set -e
 
-command -v debian-chroot
+id="$(id -u)"
+if [ "$id" -ne 0 ]; then
+    printf "E: permission denied\n" >&2; exit 1
+elif ! command -v arch-chroot > /dev/null; then
+    printf "E: 'arch-chroot' command not installed\n" >&2; exit 1
+elif ! mount | grep -q 'efivars'; then
+    printf "E: not booted into UEFI mode\n" >&2; exit 1
+fi
 
-test "$#" -eq 1
-export DEVICE="${1%/}"
+case $# in
+    0) printf "E: missing device operand\n" >&2; exit 1 ;;
+    1) ;;
+    *) printf "E: too many operands\n" >&2; exit 1 ;;
+esac
 
-DEVICE_NAME="${DEVICE##*/}"
-case "$DEVICE_NAME" in (*nvme*) DEVICE_NAME="${DEVICE_NAME}p" ;; esac
+DEVICE="${1%/}"
+DEVICE_M="${DEVICE##*/}"
 
-ID=`id -u`
-test "$ID" -eq 0
+case "$DEVICE_M" in
+    *nvme*)
+        DEVICE_P="${DEVICE}p"
+        DEVICE_M="${DEVICE_M}p"
+        ;;
+    *)
+        DEVICE_P="$DEVICE"
+        DEVICE_M="$DEVICE_M"
+        ;;
+esac
 
-mount | grep -q 'efivars'
-
-sgdisk --zap-all "$DEVICE"
-sgdisk --new=1:0:+768M --typecode=1:8301 --change-name=1:/boot \
-       --new=2:0:+2M --typecode=2:ef02 --change-name=2:GRUB \
-       --new=3:0:+128M --typecode=3:ef00 --change-name=3:EFI-SP \
-       --new=5:0:0 --typecode=5:8301 --change-name=5:rootfs \
-       "$DEVICE"
+set -x
+sgdisk -Z "$DEVICE"
+sgdisk --new=1:0:+768M --typecode=1:8301 --change-name=1:BOOT   "$DEVICE"
+sgdisk --new=2:0:+2M   --typecode=2:ef02 --change-name=2:GRUB   "$DEVICE"
+sgdisk --new=3:0:+128M --typecode=3:ef00 --change-name=3:EFI-SP "$DEVICE"
+sgdisk --new=5:0:0     --typecode=5:8301 --change-name=5:ROOT   "$DEVICE"
 sgdisk --hybrid 1:2:3 "$DEVICE"
 
-cryptsetup luksFormat --type=luks1 "${DEVICE}p1"
-cryptsetup luksFormat "${DEVICE}p5"
-cryptsetup open "${DEVICE}p1" "LUKS_BOOT"
-cryptsetup open "${DEVICE}p5" "${DEVICE_NAME}5_crypt"
+cryptsetup luksFormat --type=luks1 "${DEVICE_P}1"
+cryptsetup luksFormat "${DEVICE_P}5"
+cryptsetup open "${DEVICE_P}1" "LUKS_BOOT"
+cryptsetup open "${DEVICE_P}5" "LUKS_CRYPT"
 
-mkfs.ext4 -L boot "/dev/mapper/LUKS_BOOT"
-mkfs.vfat -F 16 -n EFI-SP "${DEVICE}p3"
-mkfs.ext4 "/dev/mapper/${DEVICE_NAME}5_crypt"
+mkfs.ext4 -L BOOT "/dev/mapper/LUKS_BOOT"
+mkfs.vfat -F 16 -n EFI-SP "${DEVICE_P}3"
+mkfs.ext4 -L ROOT "/dev/mapper/LUKS_CRYPT"
+set +x
 
 # run installer, manually configure partitions, setup user account...
-set +x
-cat <<- 'EndOfFile'
-	################################################
-	####            RUN INSTALLER               ####
-	################################################
-EndOfFile
+echo "################################################"
+echo "####            RUN INSTALLER               ####"
+echo "################################################"
 
-while [ ! -d /target/etc/default/grub.d ]; do sleep 1; done
-printf 'GRUB_ENABLE_CRYPTODISK=y\n' >> /target/etc/default/grub
+until [ -d /target/etc/default/grub.d ]; do sleep 1; done
+printf "GRUB_ENABLE_CRYPTODISK=y\n" > /target/etc/default/grub.d/local.cfg
 
-printf '\n:: After the installer is done press Enter: '; read -r NULL
+printf "\n:: After the installer is done press Enter: "
+read -r NULL
 
-# Post Installation:
-set -x
-debian-chroot /target /bin/sh -c "
-set -e
-set -x
+# post installation
+tail -n +79 "$0" > /target/inside-chroot.sh
+chmod a+x /target/inside-chroot.sh
+arch-chroot /target /inside-chroot.sh "$DEVICE" "$DEVICE_P" "$DEVICE_M"
+rm -f /target/inside-chroot.sh
+
+echo "################################################"
+echo "####          DONE: YOU CAN REBOOT          ####"
+echo "################################################"
+
+exit 0
+
+# from this point on it is a inside chroot script
+#!/bin/sh
+
+DEVICE="$1"
+DEVICE_P="$2"
+DEVICE_M="$3"
+
+LUKS="/etc/luks"
+KEY="$LUKS/boot_os.keyfile"
+HOOK="/etc/cryptsetup-initramfs/conf-hook"
+INIT="/etc/initramfs-tools/initramfs.conf"
+
+set -ex
 mount -a
-printf 'KEYFILE_PATTERN=/etc/luks/*.keyfile\\n' >> /etc/cryptsetup-initramfs/conf-hook
-printf 'UMASK=0077\\n' >> /etc/initramfs-tools/initramfs.conf
-mkdir /etc/luks
-dd if=/dev/urandom of=/etc/luks/boot_os.keyfile bs=4096 count=1
-chmod u=rx,go-rwx /etc/luks
-chmod u=r,go-rwx /etc/luks/boot_os.keyfile
-cryptsetup luksAddKey '${DEVICE}p1' /etc/luks/boot_os.keyfile
-cryptsetup luksAddKey '${DEVICE}p5' /etc/luks/boot_os.keyfile
-DEVICE_UUID_BOOT=\"\$(blkid -s UUID -o value '${DEVICE}p1')\"
-DEVICE_UUID_CRYPT=\"\$(blkid -s UUID -o value '${DEVICE}p5')\"
-printf 'LUKS_BOOT UUID=%s /etc/luks/boot_os.keyfile luks,discard\n' '$DEVICE_UUID_BOOT' >> /etc/crypttab
-printf '%s UUID=%s /etc/luks/boot_os.keyfile luks,discard\n' '${DEVICE_NAME}5_crypt' '$DEVICE_UUID_CRYPT' >> /etc/crypttab
-update-initramfs -u -k all"
-
-set +x
-cat <<- 'EndOfFile'
-	################################################
-	####          DONE: YOU CAN REBOOT          ####
-	################################################
-EndOfFile
+printf "%s\n" "KEYFILE_PATTERN=/etc/luks/*.keyfile" >> "$HOOK"
+printf "%s\n" "UMASK=0077" >> "$INIT"
+mkdir -p /etc/luks
+dd if=/dev/urandom of="$KEY" bs=512 count=1
+sync
+chmod u=rx,go-rwx "$LUKS"
+chmod u=r,go-rwx "$KEY"
+cryptsetup luksAddKey "${DEVICE_P}1" "$KEY"
+cryptsetup luksAddKey "${DEVICE_P}5" "$KEY"
+BOOT="$(blkid -s UUID -o value "${DEVICE_P}1")"
+CRYPT="$(blkid -s UUID -o value "${DEVICE_P}5")"
+printf "%s\n" "LUKS_BOOT UUID=$BOOT $KEY luks,discard" >> /etc/crypttab
+printf "%s\n" "LUKS_CRYPT UUID=$CRYPT $KEY luks,discard" >> /etc/crypttab
+update-initramfs -u -k all
