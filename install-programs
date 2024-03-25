@@ -30,10 +30,13 @@ VIRTUAL=(qemu-system-x86
          virt-manager
          bridge-utils)
 
+MISC=(heif-gdk-pixbuf)
+
 PROGRAMS=("${CLI[@]}"
           "${GUI[@]}"
           "${ARCHIVE[@]}"
-          "${VIRTUAL[@]}")
+          "${VIRTUAL[@]}"
+          "${MISC[@]}")
 
 SNAP=(freecad
       multipass
