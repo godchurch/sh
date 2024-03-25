@@ -1,84 +1,61 @@
-#!/bin/sh
+#!/bin/bash
 
-Error ()
-{
-	format="E: ${1}\\n"
-	shift 1
-	printf "$format" "$@" >&2
-	exit 1
-}
-
-effective_user_id="$(id -u 2> /dev/null)"
-test "${effective_user_id:-1000}" -eq 0 || Error 'Permission denied'
-
-command -v debootstrap > /dev/null || Error 'Missing dependency -- debootstrap'
-command -v sfdisk > /dev/null || Error 'Missing dependency -- sfdisk'
-command -v debian-chroot > /dev/null || Error 'Missing dependency -- debian-chroot'
-
-case $# in
-(0) Error 'Missing device operand' ;;
-(1) code_name="$(lsb_release -sc)" || Error 'Unable to get code_name operand' ;;
-(*) Error 'Extra operands specified' ;;
-esac
-
-device="$1"
-partition="${device}1"
-
-build_directory="/target"
-
-set -x
 set -e
 
-sfdisk -f "$device" << EndOfFile
-2048,
-EndOfFile
-sfdisk -f --part-type "$device" 1 83
-sfdisk -f -A "$device" 1
-mkfs.ext4 "$partition"
+end () { printf "E: $1\n"; exit 1; } >&2
 
-mkdir -p "$build_directory"
-mount "$partition" "$build_directory"
-debootstrap --arch amd64 "$code_name" "$build_directory"
+ID="$(id -u)"
+[ "$ID" -eq 0 ] || end "permission denied"
 
-block_device_attributes="$(blkid --probe --output export "$partition")"
-unset UUID TYPE
-eval "$block_device_attributes"
-test -n "$UUID"
-test -n "$TYPE"
+command -v debootstrap > /dev/null || end "'debootstrap' not installed"
+command -v sfdisk > /dev/null || end "'sfdisk' not installed"
+command -v arch-chroot > /dev/null || end "'arch-chroot' not installed"
 
-AWK='BEGIN{ printf "network:\n  version: 2\n  renderer: %s\n  ethernets:", "networkd" }
-/^[0-9]+/ && $2 != "lo:" { printf "\n    %s\n      dhcp4: true", $2 }'
+[ $# -eq 0 ] && end "missing device operand"
+[ $# -ge 2 ] && end "too many operands"
 
-formated_ip="$(ip link show)"
-formated_ip="$(printf '%s' "$formated_ip" | awk "$AWK")"
+CODE="$(lsb_release -sc)" || end "unable to get codename operand"
+RELEASE="$(lsb_release -sr)" || end "unable to get release operand"
 
-fstab="UUID=$UUID / $TYPE errors=remount-ro 0 1
-tmpfs /tmp tmpfs nosuid,nodev 0 0"
-hostname="ubuntu"
-hosts="127.0.0.1    localhost
-127.0.1.1    $hostname"
-apt_sources="\
-deb http://archive.ubuntu.com/ubuntu/ ${code_name} main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu/ ${code_name}-updates main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu/ ${code_name}-backports main restricted universe multiverse
-# deb http://archive.canonical.com/ubuntu ${code_name} partner
-deb http://security.ubuntu.com/ubuntu ${code_name}-security main restricted universe multiverse"
+DEVICE="${1%/}"
+PART="${DEVICE}1"
+TARGET="/target"
 
-mkdir -p "$build_directory/etc/netplan"
-printf '%s\n' "$formated_ip" > "$build_directory/etc/netplan/01-netcfg.yaml"
-mkdir -p "$build_directory/etc/apt"
-printf '%s\n' "$apt_sources" > "$build_directory/etc/apt/sources.list"
-printf '%s\n' "$fstab" > "$build_directory/etc/fstab"
-printf '%s\n' "$hostname" > "$build_directory/etc/hostname"
-printf '%s\n' "$hosts" > "$build_directory/etc/hosts"
+echo "type=83, bootable" | sfdisk "$DEVICE"
+mkfs.ext4 "$PART"
 
-LC_ALL=C debian-chroot "$build_directory" /bin/sh -c "
-set -x
-set -e
-apt-get update
-apt-get install -y linux-image-generic linux-headers-generic grub-pc build-essential
-apt-get dist-upgrade -y
-apt-get autoremove -y
-apt-get clean -y
-grub-install --target=i386-pc \"$device\"
-update-grub"
+mkdir -p "$TARGET"
+mount "$PART" "$TARGET"
+debootstrap --arch=amd64 "$CODE" "$TARGET"
+
+UUID="$(blkid -s UUID -o value "$PART")"
+TYPE="$(blkid -s TYPE -o value "$PART")"
+echo "UUID=$UUID / $TYPE errors=remount-ro 0 1" > "$TARGET/etc/fstab"
+echo "tmpfs /tmp tmpfs nosuid,nodev 0 0">> "$TARGET/etc/fstab"
+
+echo "ubuntu" > "$TARGET/etc/hostname"
+
+echo "127.0.0.1    localhost" > "$TARGET/etc/hosts"
+echo "127.0.1.1    ubuntu" >> "$TARGET/etc/hosts"
+
+LINK_A="http://archive.ubuntu.com/ubuntu/"
+LINK_s="http://security.ubuntu.com/ubuntu/"
+REPO="main restricted universe multiverse"
+mkdir -p "$TARGET/etc/apt"
+echo "deb $LINK_A $CODE $REPO" > "$TARGET/etc/apt/sources.list"
+echo "deb $LINK_A $CODE-updates $REPO" >> "$TARGET/etc/apt/sources.list"
+echo "deb $LINK_A $CODE-backports $REPO" >> "$TARGET/etc/apt/sources.list"
+echo "deb $LINK_S $CODE-security $REPO">> "$TARGET/etc/apt/sources.list"
+
+mkdir -p "$TARGET/etc/netplan"
+echo "network:" > "$TARGET/etc/netplan/01-network-manager-all.yaml"
+echo "  version: 2" >> "$TARGET/etc/netplan/01-network-manager-all.yaml"
+echo "  renderer: NetworkManager" >> "$TARGET/etc/netplan/01-network-manager-all.yaml"
+
+arch-chroot "$TARGET" apt-get update
+arch-chroot "$TARGET" apt-get upgrade
+arch-chroot "$TARGET" apt-get install ubuntu-standard "linux-generic-hwe-$RELEASE" build-essential
+arch-chroot "$TARGET" apt-get autoremove
+arch-chroot "$TARGET" apt-get clean
+arch-chroot "$TARGET" grub-install --target=i386-pc "$DEVICE"
+arch-chroot "$TARGET" update-grub
