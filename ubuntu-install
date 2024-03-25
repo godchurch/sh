@@ -35,11 +35,8 @@ echo "tmpfs /tmp tmpfs nosuid,nodev 0 0">> "$TARGET/etc/fstab"
 
 echo "ubuntu" > "$TARGET/etc/hostname"
 
-echo "127.0.0.1    localhost" > "$TARGET/etc/hosts"
-echo "127.0.1.1    ubuntu" >> "$TARGET/etc/hosts"
-
 LINK_A="http://archive.ubuntu.com/ubuntu/"
-LINK_s="http://security.ubuntu.com/ubuntu/"
+LINK_S="http://security.ubuntu.com/ubuntu/"
 REPO="main restricted universe multiverse"
 mkdir -p "$TARGET/etc/apt"
 echo "deb $LINK_A $CODE $REPO" > "$TARGET/etc/apt/sources.list"
