@@ -18,41 +18,58 @@ CODE="$(lsb_release -sc)" || end "unable to get codename operand"
 RELEASE="$(lsb_release -sr)" || end "unable to get release operand"
 
 DEVICE="${1%/}"
-PART="${DEVICE}1"
 TARGET="/target"
 
 echo "type=83, bootable" | sfdisk "$DEVICE"
-mkfs.ext4 "$PART"
+mkfs.ext4 "${DEVICE}1"
 
 mkdir -p "$TARGET"
-mount "$PART" "$TARGET"
+mount "${DEVICE}1" "$TARGET"
 debootstrap --arch=amd64 "$CODE" "$TARGET"
 
-UUID="$(blkid -s UUID -o value "$PART")"
-TYPE="$(blkid -s TYPE -o value "$PART")"
-echo "UUID=$UUID / $TYPE errors=remount-ro 0 1" > "$TARGET/etc/fstab"
-echo "tmpfs /tmp tmpfs nosuid,nodev 0 0">> "$TARGET/etc/fstab"
+UUID="$(blkid -s UUID -o value "${DEVICE}1")"
+TYPE="$(blkid -s TYPE -o value "${DEVICE}1")"
+cat > "$TARGET/etc/fstab" << EOF
+UUID=$UUID / $TYPE errors=remount-ro 0 1
+tmpfs /tmp tmpfs nosuid,nodev 0 0
+EOF
 
-echo "ubuntu" > "$TARGET/etc/hostname"
+cat > "$TARGET/etc/hostname" << EOF
+ubuntu
+EOF
 
-LINK_A="http://archive.ubuntu.com/ubuntu/"
-LINK_S="http://security.ubuntu.com/ubuntu/"
-REPO="main restricted universe multiverse"
+cat > "$TARGET/etc/hosts" << EOF
+127.0.0.1    localhost
+127.0.1.1    ubuntu
+EOF
+
 mkdir -p "$TARGET/etc/apt"
-echo "deb $LINK_A $CODE $REPO" > "$TARGET/etc/apt/sources.list"
-echo "deb $LINK_A $CODE-updates $REPO" >> "$TARGET/etc/apt/sources.list"
-echo "deb $LINK_A $CODE-backports $REPO" >> "$TARGET/etc/apt/sources.list"
-echo "deb $LINK_S $CODE-security $REPO">> "$TARGET/etc/apt/sources.list"
+cat > "$TARGET/etc/apt/sources.list" << EOF
+deb http://archive.ubuntu.com/ubuntu/ ${CODE} main restricted
+deb http://archive.ubuntu.com/ubuntu/ ${CODE} universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ ${CODE}-updates main restricted
+deb http://archive.ubuntu.com/ubuntu/ ${CODE}-updates universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ ${CODE}-backports main restricted
+deb http://archive.ubuntu.com/ubuntu/ ${CODE}-backports universe multiverse
+deb http://security.ubuntu.com/ubuntu ${CODE}-security main restricted
+deb http://security.ubuntu.com/ubuntu ${CODE}-security universe multiverse
+EOF
 
+ETHER="$(ip addr | sed -n 's/^[0-9]\{1,\}: \{1,\}\(enp[[:alnum:]]\{1,\}\):.*$/\1/p')"
 mkdir -p "$TARGET/etc/netplan"
-echo "network:" > "$TARGET/etc/netplan/01-network-manager-all.yaml"
-echo "  version: 2" >> "$TARGET/etc/netplan/01-network-manager-all.yaml"
-echo "  renderer: NetworkManager" >> "$TARGET/etc/netplan/01-network-manager-all.yaml"
+cat > "$TARGET/etc/netplan/99_config.yaml" << EOF
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    $ETHER:
+      dhcp4: true
+EOF
 
 arch-chroot "$TARGET" apt-get update
-arch-chroot "$TARGET" apt-get upgrade
-arch-chroot "$TARGET" apt-get install ubuntu-standard "linux-generic-hwe-$RELEASE" build-essential
-arch-chroot "$TARGET" apt-get autoremove
+arch-chroot "$TARGET" apt-get -y upgrade
+arch-chroot "$TARGET" apt-get -y install ubuntu-standard "linux-generic-hwe-$RELEASE"
+arch-chroot "$TARGET" apt-get -y autoremove
 arch-chroot "$TARGET" apt-get clean
 arch-chroot "$TARGET" grub-install --target=i386-pc "$DEVICE"
 arch-chroot "$TARGET" update-grub
