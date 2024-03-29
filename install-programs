@@ -13,10 +13,12 @@ CLI=(neovim
      make
      m4
      ffmpeg
-     curl)
+     curl
+     aria2)
 
 GUI=(mpv
      keepassxc
+     qbittorrent
      gimp
      audacity)
 
