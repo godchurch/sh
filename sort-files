@@ -1,0 +1,20 @@
+#!/bin/sh
+
+pad_size ()
+{
+    while read -r SIZE NAME; do
+        printf "%0.20d %s\n" "$SIZE" "$NAME"
+    done
+}
+show_list ()
+{
+    while read -r SIZE NAME; do
+        du -s --human-readable "$NAME"
+    done
+}
+
+if du -s "$@" > /dev/null 2>&1; then
+    du -s "$@" | pad_size | sort | show_list
+else
+    du -s "$@" > /dev/null
+fi
