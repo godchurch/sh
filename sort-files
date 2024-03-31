@@ -9,8 +9,9 @@ pad_size ()
 show_list ()
 {
     while read -r SIZE NAME; do
-        du -s --human-readable "$NAME"
+        set -- "$@" "$NAME"
     done
+    du -s --human-readable "$@"
 }
 
 if du -s "$@" > /dev/null 2>&1; then
