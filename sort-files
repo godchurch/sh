@@ -3,7 +3,7 @@
 pad_size ()
 {
     while read -r SIZE NAME; do
-        printf "%0.20d %s\n" "$SIZE" "$NAME"
+        printf "%020d %s\n" "$SIZE" "$NAME"
     done
 }
 show_list ()
