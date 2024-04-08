@@ -14,8 +14,6 @@ show_list ()
     du -s --human-readable "$@"
 }
 
-if du -s "$@" > /dev/null 2>&1; then
+if du -s "$@" > /dev/null; then
     du -s "$@" | pad_size | sort | show_list
-else
-    du -s "$@" > /dev/null
 fi
