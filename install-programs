@@ -1,48 +1,47 @@
-#!/bin/bash
-
-if (( "$EUID" > 0 )); then
-    printf "E: Permission denied\n" >&2
-    exit 1
-fi
+#!/bin/sh
 
 set -e
 
-CLI=(neovim
-     tmux
-     git
-     make
-     m4
-     ffmpeg
-     curl
-     aria2)
+id="$(id -u)"
+if [ "$id" -ne 0 ]; then
+    printf "%s: permission denied\n" "${0##*/}" >&2
+    exit 1
+fi
 
-GUI=(mpv
-     keepassxc
-     qbittorrent
-     gimp
-     audacity)
+shift $#
+while read -r package description; do
+    case "$((${#package} + ${#description}))" in
+        0) continue 1 ;;
+        *) set -- "$@" "$package" ;;
+    esac
+done << PACKAGES
+    neovim    # Heavily refactored vim fork
+    tmux      # Terminal multiplexer
+    git       # Fast, scalable, distributed revision control system
+    make      # Utility for directing compilation
+    m4        # Macro processing language
+    ffmpeg    # Tools for transcoding, streaming and playing of multimedia files
+    curl      # Command line tool for transferring data with URL syntax
+    aria2     # High speed download utility
 
-ARCHIVE=(p7zip
-         p7zip-full
-         unar)
+    p7zip         # 7zr file archiver with high compression ratio
+    p7zip-full    # 7z and 7za file archivers with high compression ratio
+    p7zip-rar     # Non-free rar module for p7zip
+    unar          # Unarchiver for a variety of file formats
 
-VIRTUAL=(qemu-system-x86
-         libvirt-daemon
-         libvirt-clients
-         virt-manager
-         bridge-utils)
+    qemu-system-x86   # QEMU full system emulation binaries (x86)
+    libvirt-daemon    # Virtualization daemon
+    libvirt-clients   # Programs for the libvirt library
+    bridge-utils      # Utilities for configuring the Linux Ethernet bridge
+    virt-manager      # Desktop application for managing virtual machines
 
-MISC=(heif-gdk-pixbuf)
+    heif-gdk-pixbuf    # HEIF file format decoder
 
-PROGRAMS=("${CLI[@]}"
-          "${GUI[@]}"
-          "${ARCHIVE[@]}"
-          "${VIRTUAL[@]}"
-          "${MISC[@]}")
+    mpv            # Video player based on MPlayer/mplayer2
+    keepassxc      # Cross Platform Password Manager
+    qbittorrent    # Bittorrent client based on libtorrent-rasterbar
+    gimp           # GNU Image Manipulation Program
+    audacity       # Fast, cross-platform audio editor
+PACKAGES
 
-SNAP=(freecad
-      multipass
-      prusa-slicer)
-
-apt-get --assume-yes install "${PROGRAMS[@]}"
-snap install "${SNAP[@]}"
+exec apt-get -y install "$@"
