@@ -1,11 +1,5 @@
 #!/bin/sh
 
-pad_size ()
-{
-    while read -r SIZE NAME; do
-        printf "%020d %s\n" "$SIZE" "$NAME"
-    done
-}
 show_list ()
 {
     while read -r SIZE NAME; do
@@ -14,4 +8,4 @@ show_list ()
     du -s --human-readable "$@"
 }
 
-du -s "$@" > /dev/null && du -s "$@" | pad_size | sort | show_list
+du -s "$@" > /dev/null && du -s "$@" | sort -k 1,1n | show_list
