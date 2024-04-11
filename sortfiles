@@ -5,4 +5,4 @@ du -s "$@" > /dev/null || exit
 IFS='
 '
 
-exec du -s --human-readable $(du -s "$@" | sort -k 1,1n | cut -f 2)
+exec du -s --human-readable $(du -s "$@" | sort -k 1,1n | cut -f 2-)
