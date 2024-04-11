@@ -1,11 +1,8 @@
 #!/bin/sh
 
-show_list ()
-{
-    while read -r SIZE NAME; do
-        set -- "$@" "$NAME"
-    done
-    du -s --human-readable "$@"
-}
+du -s "$@" > /dev/null || exit
 
-du -s "$@" > /dev/null && du -s "$@" | sort -k 1,1n | show_list
+IFS='
+'
+
+exec du -s --human-readable $(du -s "$@" | sort -k 1,1n | cut -f 2)
