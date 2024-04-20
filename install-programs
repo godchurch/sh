@@ -36,6 +36,7 @@ done << PACKAGES
     virt-manager      # Desktop application for managing virtual machines
 
     heif-gdk-pixbuf    # HEIF file format decoder
+    libheif-examples   # HEIF file format decoder - examples
 
     mpv            # Video player based on MPlayer/mplayer2
     keepassxc      # Cross Platform Password Manager
