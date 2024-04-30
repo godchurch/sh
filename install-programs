@@ -37,6 +37,7 @@ done << PACKAGES
 
     heif-gdk-pixbuf    # HEIF file format decoder
     libheif-examples   # HEIF file format decoder - examples
+    jpegoptim          # Utility to optimize jpeg files
 
     mpv            # Video player based on MPlayer/mplayer2
     keepassxc      # Cross Platform Password Manager
