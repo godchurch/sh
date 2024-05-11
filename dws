@@ -5,22 +5,12 @@ error () { printf "%s: %s\n" "${0##*/}" "$*" >&2; exit 1; }
 command -v yt-dlp > /dev/null || error "program 'yt-dlp' not found, please install it"
 command -v ffmpeg > /dev/null || error "program 'ffmpeg' not found, please install it"
 
-while getopts :hsd: OPTION; do
+while getopts :hd: OPTION; do
     case "$OPTION" in
         (h)
             printf "%5s: %s [-d directory] link\n" "USAGE" "${0##*/}"
-            printf "%5s  %s -s\n" "" "${0##*/}"
             printf "%5s  %s -h\n" "" "${0##*/}"
             exit 0
-            ;;
-        (s)
-            if [ -f ~/.local/share/dws/links.txt ]; then
-                cat ~/.local/share/dws/links.txt; exit
-            elif [ -f /usr/local/share/dws/links.txt ];then
-                cat /usr/local/share/dws/links.txt; exit
-            else
-                error "missing links file"
-            fi
             ;;
         (d)
             [ -d "$OPTARG" ] || error "directory ($OPTARG) doesn't exist"
