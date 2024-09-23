@@ -41,9 +41,7 @@ done << PACKAGES
 
     mpv            # Video player based on MPlayer/mplayer2
     keepassxc      # Cross Platform Password Manager
-    qbittorrent    # Bittorrent client based on libtorrent-rasterbar
     gimp           # GNU Image Manipulation Program
-    audacity       # Fast, cross-platform audio editor
 PACKAGES
 
 exec apt-get -y install "$@"
