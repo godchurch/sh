@@ -31,5 +31,5 @@ shift $((OPTIND - 1))
 [ -w "$PWD" ] || error "write permision denied for current directory"
 
 exec yt-dlp --embed-metadata \
-    --downloader ffmpeg --downloader-args ffmpeg_i:"-loglevel error -stats" \
+    --downloader ffmpeg --downloader-args ffmpeg_i:"-loglevel fatal -stats" \
     -o "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$1"
