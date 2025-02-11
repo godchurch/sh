@@ -1,3 +1,0 @@
-#!/bin/sh
-
-tr -dc 'A-F0-9' < /dev/urandom | fold -w 1 | head -n 12 | xargs -E "" printf "%c%c-%c%c-%c%c-%c%c-%c%c-%c%c\n"
