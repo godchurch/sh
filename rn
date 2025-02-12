@@ -3,8 +3,8 @@
 
 set -e
 
-TMP_IN="${TMPDIR:-/tmp}/rn-input.$$"
-TMP_OUT="${TMPDIR:-/tmp}/rn-output.$$"
+TMP_IN="${TMPDIR:-/tmp}/$$-input"
+TMP_OUT="${TMPDIR:-/tmp}/$$-output"
 
 trap 'rm -f "$TMP_IN" "$TMP_OUT"' EXIT
 
