@@ -1,10 +1,10 @@
 #!/bin/sh
-# The 'github.com/thameera/vimv' script but rewriten in sh
+# The 'github.com/thameera/vimv' script but rewritten in sh.
 
 set -e
 
-TMP_IN="${TMPDIR:-/tmp}/vimv-input.$$"
-TMP_OUT="${TMPDIR:-/tmp}/vimv-output.$$"
+TMP_IN="${TMPDIR:-/tmp}/brn-input.$$"
+TMP_OUT="${TMPDIR:-/tmp}/brn-output.$$"
 
 trap 'rm -f "$TMP_IN" "$TMP_OUT"' EXIT
 
