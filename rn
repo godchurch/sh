@@ -40,6 +40,6 @@ while [ "$INDEX" -le "$LINES_IN" ]; do
 done
 
 case "$COUNT" in
-    0) printf "Filename(s) were unchanged.\n" ;;
+    0) printf "No filenames were changed.\n" ;;
     *) printf "%s file(s) renamed.\n" "$COUNT" ;;
 esac
