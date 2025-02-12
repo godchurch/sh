@@ -1,0 +1,45 @@
+#!/bin/sh
+# The 'github.com/thameera/vimv' script but rewriten in sh
+
+set -e
+
+TMP_IN="${TMPDIR:-/tmp}/vimv-input.$$"
+TMP_OUT="${TMPDIR:-/tmp}/vimv-output.$$"
+
+trap 'rm -f "$TMP_IN" "$TMP_OUT"' EXIT
+
+[ $# -eq 0 ] && IFS='
+' && set -- $(ls)
+
+[ $# -eq 0 ] && { printf "ERROR: current directory empty\n" >&2; exit 1; }
+
+printf "%s\n" "$@" > "$TMP_IN"
+printf "%s\n" "$@" > "$TMP_OUT"
+
+${EDITOR:-vi} "$TMP_OUT"
+
+LINES_IN="$(wc -l < "$TMP_IN")"
+LINES_OUT="$(wc -l < "$TMP_OUT")"
+
+[ "$LINES_IN" -ne "$LINES_OUT" ] && { printf "ERROR: added/deleted lines\n" >&2; exit 1; }
+
+INDEX=0 COUNT=0
+while [ "$INDEX" -le "$LINES_IN" ]; do
+    INDEX="$(($INDEX + 1))"
+    INPUT="$(sed -n "${INDEX}p" < "$TMP_IN")"
+    OUTPUT="$(sed -n "${INDEX}p" < "$TMP_OUT")"
+    if [ "$INPUT" != "$OUTPUT" ]; then
+        mkdir -p "$(dirname "$OUTPUT")"
+        if git ls-files --error-unmatch "$INPUT" > /dev/null 2>&1; then
+            git mv -- "$INPUT" "$OUTPUT"
+        else
+            mv -- "$INPUT" "$OUTPUT"
+        fi
+        COUNT="$(($COUNT + 1))"
+    fi
+done
+
+case "$COUNT" in
+    0) printf "Filename(s) were unchanged.\n" ;;
+    *) printf "%s file(s) renamed.\n" "$COUNT" ;;
+esac
