@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -e
+
+error () { printf "%s: %s\n" "${0##*/}" "$*" >&2; exit 1; }
+
+command -v ddcutil > /dev/null || error "command 'ddcutil' not found"
+
+case $# in
+    0)
+        ddcutil --display 1 getvcp 10
+        ddcutil --display 2 getvcp 10
+        ;;
+    1)
+        case "$1" in
+            0|[1-9][0-9]|100) ;;
+            *) error "invalid percentage (hint: 0-100)" ;;
+        esac
+
+        ddcutil --display 1 setvcp 10 "$1"
+        ddcutil --display 2 setvcp 10 "$1"
+        ;;
+    *)
+        error "too many operands"
+        ;;
+esac
+
