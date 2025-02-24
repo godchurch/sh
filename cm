@@ -34,9 +34,11 @@ esac
 
 case "$display" in
     [1-9])
+        set -x
         ddcutil --display "$display" "$operation" "$code" "$@"
         ;;
     all)
+        set -x
         ddcutil --display 1 "$operation" "$code" "$@"
         ddcutil --display 2 "$operation" "$code" "$@"
         ;;
