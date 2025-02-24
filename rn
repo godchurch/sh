@@ -3,43 +3,67 @@
 
 set -e
 
-TMP_IN="${TMPDIR:-/tmp}/$$-input"
-TMP_OUT="${TMPDIR:-/tmp}/$$-output"
-
-trap 'rm -f "$TMP_IN" "$TMP_OUT"' EXIT
-
-[ $# -eq 0 ] && IFS='
-' && set -- $(ls)
-
-[ $# -eq 0 ] && { printf "ERROR: current directory empty\n" >&2; exit 1; }
-
-printf "%s\n" "$@" > "$TMP_IN"
-printf "%s\n" "$@" > "$TMP_OUT"
-
-${EDITOR:-vi} "$TMP_OUT"
-
-LINES_IN="$(wc -l < "$TMP_IN")"
-LINES_OUT="$(wc -l < "$TMP_OUT")"
-
-[ "$LINES_IN" -ne "$LINES_OUT" ] && { printf "ERROR: added/deleted lines\n" >&2; exit 1; }
-
-INDEX=0 COUNT=0
-while [ "$INDEX" -le "$LINES_IN" ]; do
-    INDEX="$(($INDEX + 1))"
-    INPUT="$(sed -n "${INDEX}p" < "$TMP_IN")"
-    OUTPUT="$(sed -n "${INDEX}p" < "$TMP_OUT")"
-    if [ "$INPUT" != "$OUTPUT" ]; then
-        mkdir -p "$(dirname "$OUTPUT")"
-        if git ls-files --error-unmatch "$INPUT" > /dev/null 2>&1; then
-            git mv -- "$INPUT" "$OUTPUT"
-        else
-            mv -- "$INPUT" "$OUTPUT"
-        fi
-        COUNT="$(($COUNT + 1))"
+if [ $# -eq 0 ]; then
+    IFS='
+'
+    ls_output="$(ls -1)"
+    set -- $ls_output
+    if [ $# -eq 0 ]; then
+        printf "%s: current directory is empty\n" "${0##*/}" >&2
+        exit 1
     fi
+fi
+
+IFS=' '
+case "$*" in
+    *'
+'*)
+        printf "%s: argument(s) contains a newline\n" "${0##*/}" >&2
+        exit 1
+        ;;
+esac
+
+filenames_file="${TMPDIR:-/tmp}/${0##*/}.$$"
+trap 'rm -f "$filenames_file"' EXIT
+
+printf "%s\n" "$@" > "$filenames_file"
+${EDITOR:-vi} "$filenames_file"
+
+files_in=$#
+files_out=0
+while read -r output; do
+    files_out="$(($files_out + 1))"
+done < "$filenames_file"
+
+if [ "$files_in" -ne "$files_out" ]; then
+    printf "%s: added/deleted lines\n" "${0##*/}" >&2
+    exit 1
+fi
+
+renamed_files=0
+while read -r output; do
+    if [ "$1" != "$output" ]; then
+        set -- "$@" "$1" "$output"
+        renamed_files="$(($renamed_files + 1))"
+    fi
+    shift 1
+done < "$filenames_file"
+
+if [ "$renamed_files" -eq 0 ]; then
+    printf "%s: no filenames were changed\n" "${0##*/}" >&2
+    exit 1
+fi
+
+until [ $# -eq 0 ]; do
+    case "$2" in
+        */*) [ -d "${2%/*}" ] || mkdir -p "${2%/*}" ;;
+    esac
+    if git ls-files --error-unmatch "$1" > /dev/null 2>&1; then
+        git mv -- "$1" "$2"
+    else
+        mv -- "$1" "$2"
+    fi
+    shift 2
 done
 
-case "$COUNT" in
-    0) printf "No filenames were changed.\n" ;;
-    *) printf "%s file(s) renamed.\n" "$COUNT" ;;
-esac
+printf "%s file(s) renamed.\n" "$renamed_files"
