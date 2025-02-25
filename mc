@@ -19,7 +19,7 @@ done
 shift $(($OPTIND - 1))
 
 [ "$operation_count" -gt 1 ] && error "too many flags specified"
-[ "$operation_count" -eq 0 ] && printf "No operation flags specified, defaulting to brightness.\n"
+[ "$operation_count" -eq 0 ] && error "no operation flags specified"
 
 case "$operation" in
     brightness) code="0x10" ;;
@@ -34,11 +34,11 @@ esac
 
 case "$display" in
     [1-9])
-        set -x
+        [ "setvcp" = "$operation" ] && set -x
         ddcutil --display "$display" "$operation" "$code" "$@"
         ;;
     all)
-        set -x
+        [ "setvcp" = "$operation" ] && set -x
         ddcutil --display 1 "$operation" "$code" "$@"
         ddcutil --display 2 "$operation" "$code" "$@"
         ;;
