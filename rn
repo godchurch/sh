@@ -53,11 +53,7 @@ until [ $# -eq 0 ]; do
     case "$2" in
         */*) [ -d "${2%/*}" ] || mkdir -p "${2%/*}" ;;
     esac
-    if git ls-files --error-unmatch "$1" > /dev/null 2>&1; then
-        git mv -- "$1" "$2"
-    else
-        mv -- "$1" "$2"
-    fi
+    mv -- "$1" "$2"
     shift 2
 done
 
