@@ -32,10 +32,7 @@ done << PACKAGES
     bridge-utils      # Utilities for configuring the Linux Ethernet bridge
     virt-manager      # Desktop application for managing virtual machines
 
-    heif-gdk-pixbuf      # HEIF file format decoder
-    libheif-examples     # HEIF file format decoder - examples
-    jpegoptim            # Utility to optimize jpeg files
-    webp-pixbuf-loader   # WebP Image format GdkPixbuf loader
+    imagemagick          # Image manipulation programs -- binaries
 
     mpv            # Video player based on MPlayer/mplayer2
     keepassxc      # Cross Platform Password Manager
