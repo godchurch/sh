@@ -10,10 +10,7 @@ fi
 
 shift $#
 while read -r package description; do
-    case "$((${#package} + ${#description}))" in
-        0) continue 1 ;;
-        *) set -- "$@" "$package" ;;
-    esac
+    if [ -n "$package" ]; then set -- "$@" "$package"; fi
 done << PACKAGES
     neovim    # Heavily refactored vim fork
     tmux      # Terminal multiplexer
