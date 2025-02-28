@@ -1,0 +1,27 @@
+#!/bin/sh
+
+if [ $# -ge 1 ]; then
+    IFS=' ' number_of_arguments=$#
+    for argument in "$@"; do
+        case "$argument" in
+            *\'*)
+                new_argument=
+                while [ "${#argument}" -ge 1 ]; do
+                    modded_argument="${argument#?}"
+                    character="${argument%$modded_argument}"
+                    argument="$modded_argument"
+                    case "$character" in
+                        \') new_argument="$new_argument'\\$character'" ;;
+                        *) new_argument="$new_argument$character" ;;
+                    esac
+                done
+                set -- "$@" "'$new_argument'"
+                ;;
+            *)
+                set -- "$@" "'$argument'"
+                ;;
+        esac
+    done
+    shift "$number_of_arguments"
+    printf " %s\n" "$*"
+fi
