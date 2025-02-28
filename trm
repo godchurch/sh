@@ -7,9 +7,9 @@ command -v ffmpeg > /dev/null || error "program 'ffmpeg' not found, please insta
 unset START END ROTATE ASSUME_YES
 while getopts :s:t:r:y OPTION; do
     case "$OPTION" in
-        (s) START="${OPTARG:-NULL}";;
-        (t) END="${OPTARG:-NULL}";;
-        (r) ROTATE="${OPTARG:-NULL}" ;;
+        (s) START="$OPTARG";;
+        (t) END="$OPTARG";;
+        (r) ROTATE="$OPTARG" ;;
         (y) ASSUME_YES="true" ;;
         (:) error "option requires an argument -- $OPTARG" ;;
         (?) error "illegal argument -- $OPTARG" ;;
@@ -60,7 +60,7 @@ case "$HOUR"   in (0[0-9]) HOUR="${HOUR#0}"     ;; esac
 case "$MINUTE" in (0[0-9]) MINUTE="${MINUTE#0}" ;; esac
 case "$SECOND" in (0[0-9]) SECOND="${SECOND#0}" ;; esac
 
-if [ -n "$START" ]; then
+if [ -n "${START+x}" ]; then
     case "$START" in
         ([0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
         (*) error "invalid start argument (hint: <MM>:<SS> or <SS>)" ;;
@@ -92,7 +92,7 @@ else
     unset START DISPLAY_START
 fi
 
-if [ -n "$END" ]; then
+if [ -n "${END+x}" ]; then
     case "$END" in
         ([0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
         (*) error "invalid end argument (hint: <MM>:<SS> or <SS>)" ;;
@@ -118,7 +118,7 @@ else
     unset END DISPLAY_DURATION DISPLAY_END
 fi
 
-if [ -n "$ROTATE" ]; then
+if [ -n "${ROTATE+x}" ]; then
     case "$ROTATE" in
         ([0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
         (*) error "invalid rotation operand" ;;
@@ -150,7 +150,7 @@ else
     printf "\n%8s: %s\n%8s: %s\n\n" Input "$INPUT_FILE" Output "$OUTPUT_FILE"
 fi
 
-if [ -z "$ASSUME_YES" ]; then
+if [ -z "${ASSUME_YES-}" ]; then
     printf 'Do you want to run command? [Y/n]: '
     read -r OPTION
     case "$OPTION" in (''|[Yy]|[Yy][Ee][Ss]) ;; (*) exit 0 ;; esac
