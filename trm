@@ -1,160 +1,180 @@
 #!/bin/sh
 
-error () { printf "${0##*/}: %s\n" "$*" >&2; exit 1; }
+set -e
 
-command -v ffmpeg > /dev/null || error "program 'ffmpeg' not found, please install it"
+USAGE="Usage: %s -i VID_XXXXXXXX_XXXXXX.mp4 [-s [mm:]ss] [-t [mm:]ss] [-r rotation] [directory]"
 
-unset START END ROTATE ASSUME_YES
-while getopts :s:t:r:y OPTION; do
-    case "$OPTION" in
-        (s) START="$OPTARG";;
-        (t) END="$OPTARG";;
-        (r) ROTATE="$OPTARG" ;;
-        (y) ASSUME_YES="true" ;;
-        (:) error "option requires an argument -- $OPTARG" ;;
-        (?) error "illegal argument -- $OPTARG" ;;
+error () { printf "%s: %s\n" "${0##*/}" "$1" 1>&2; exit 1; }
+usage () { printf "$USAGE\n" "${0##*/}" 1>&2; exit 0; }
+
+media_converter="$(command -p -v ffmpeg)" || error "command not found -- ffmpeg"
+
+unset input rotate assume_yes start display_start end display_duration display_end
+while getopts :hi:s:t:r:y option; do
+    case "$option" in
+        h) usage ;;
+        i) input="$OPTARG" ;;
+        s) start="$OPTARG" ;;
+        t) end="$OPTARG" ;;
+        r) rotate="$OPTARG" ;;
+        y) assume_yes=1 ;;
+        :) error "option requires an argument -- $OPTARG" ;;
+        ?) error "illegal argument -- $OPTARG" ;;
     esac
 done
-shift $((OPTIND - 1))
+shift $(($OPTIND - 1))
 
-case $# in
-    (0) error "missing input operands" ;;
-    (1) set -- "$@" "$PWD" ;;
-    (2) ;;
-    (*) error "too many directory operands" ;;
+[ $# -le 1 ] || error "too many directory operands"
+[ $# -lt 1 ] && set -- '.'
+
+[ -n "${input+x}" ] || error "input file not specified"
+[ -f "$input" ] || error "file does not exist or is not a regular file -- $input"
+[ -r "$input" ] || error "unable to read file -- $input"
+
+case "${input##*/}" in
+    VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4) ;;
+    *) error "invalid file operand" ;;
 esac
 
-[ -f "$1" ] || error "'$1' does not exist or is not a regular file"
-[ -r "$1" ] || error "unable to read \"$1\" file"
+case "$input" in
+    */*) input_folder="${input%/*}" input_file="${input##*/}" ;;
+    *) input_folder="." input_file="$input" ;;
+esac
+
+[ -d "$1" ] || error "directory does not exist or is not a directory"
+[ -w "$1" ] || error "permission denied for output directory"
+
 case "$1" in
-    (/*) INPUT_FILE="$1" ;;
-    (./*) INPUT_FILE="$PWD/${1#*\./}" ;;
-    (*) INPUT_FILE="$PWD/$1" ;;
-esac
-INPUT_DIR="${INPUT_FILE%/*}" INPUT_FILE="${INPUT_FILE##*/}"
-
-case "$INPUT_FILE" in
-    (VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4) ;;
-    (*) error "invalid file operand" ;;
+    /) output_folder="$1" ;;
+    *) output_folder="${1%/}" ;;
 esac
 
-[ -n "$2" ] || error "directory operand cannot be a empty string"
-[ -d "$2" ] || error "directory does not exist or is not a directory"
-[ -w "$2" ] || error "permission denied for output directory"
-OUTPUT_DIR="$(cd "$2" && pwd)"
+input_string="$(cd "$input_folder" && pwd)"
+output_string="$(cd "$output_folder" && pwd)"
+[ "$input_string" != "$output_string" ] || error "input can not be in output directory"
 
-[ "$INPUT_DIR" = "$OUTPUT_DIR" ] && error "input can not be in output directory"
+unset count prefix suffix year month day hour minute second
 
-PREFIX="$INPUT_FILE"            PREFIX="${PREFIX%%_*}_" DELETE="${PREFIX}"           \
-YEAR="${INPUT_FILE#$DELETE}"    YEAR="${YEAR%????_*}"   DELETE="${DELETE}${YEAR}"    \
-MONTH="${INPUT_FILE#$DELETE}"   MONTH="${MONTH%??_*}"   DELETE="${DELETE}${MONTH}"   \
-DAY="${INPUT_FILE#$DELETE}"     DAY="${DAY%_*}"         DELETE="${DELETE}${DAY}_"    \
-HOUR="${INPUT_FILE#$DELETE}"    HOUR="${HOUR%????.*}"   DELETE="${DELETE}${HOUR}"    \
-MINUTE="${INPUT_FILE#$DELETE}"  MINUTE="${MINUTE%??.*}" DELETE="${DELETE}${MINUTE}"  \
-SECOND="${INPUT_FILE#$DELETE}"  SECOND="${SECOND%.*}"   DELETE="${DELETE}${SECOND}"  \
-SUFFIX="${INPUT_FILE#$DELETE}"
+string="$input_file"
+while [ "${#string}" -ge 1 ]; do
+    count="$((${count-0} + 1))"
+    modded_string="${string#?}"
+    character="${string%$modded_string}"
+    string="$modded_string"
+    case "$count" in
+        [123]) prefix="$prefix$character" ;;
+        [5678]) year="$year$character" ;;
+        9|10) month="$month$character" ;;
+        1[12]) day="$day$character" ;;
+        1[45]) hour="$hour$character" ;;
+        1[67]) minute="$minute$character" ;;
+        1[89]) second="$second$character" ;;
+        2[123]) suffix="$suffix$character" ;;
+    esac
+done
 
-case "$MONTH"  in (0[0-9]) MONTH="${MONTH#0}"   ;; esac
-case "$DAY"    in (0[0-9]) DAY="${DAY#0}"       ;; esac
-case "$HOUR"   in (0[0-9]) HOUR="${HOUR#0}"     ;; esac
-case "$MINUTE" in (0[0-9]) MINUTE="${MINUTE#0}" ;; esac
-case "$SECOND" in (0[0-9]) SECOND="${SECOND#0}" ;; esac
+case "$month" in 0[0-9]) month="${month#0}" ;; esac
+case "$day" in 0[0-9]) day="${day#0}" ;; esac
+case "$hour" in 0[0-9]) hour="${hour#0}" ;; esac
+case "$minute" in 0[0-9]) minute="${minute#0}" ;; esac
+case "$second" in 0[0-9]) second="${second#0}" ;; esac
 
-if [ -n "${START+x}" ]; then
-    case "$START" in
-        ([0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        (*) error "invalid start argument (hint: <MM>:<SS> or <SS>)" ;;
+if [ -n "${start+x}" ]; then
+    case "$start" in
+        [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
+        *) error "invalid start argument (hint: <mm>:<ss> or <ss>)" ;;
     esac
 
-    case "$START" in
-        (*:*) START_MINUTE="${START%:*}" START_SECOND="${START#*:}" ;;
-        (*)   START_MINUTE=0             START_SECOND="$START" ;;
+    case "$start" in
+        *:*) start_minute="${start%:*}" start_second="${start#*:}" ;;
+        *) start_minute=0 start_second="$start" ;;
     esac
 
-    case "$START_MINUTE" in (0[0-9]) START_MINUTE="${START_MINUTE#0}" ;; esac
-    case "$START_SECOND" in (0[0-9]) START_SECOND="${START_SECOND#0}" ;; esac
+    case "$start_minute" in 0[0-9]) start_minute="${start_minute#0}" ;; esac
+    case "$start_second" in 0[0-9]) start_second="${start_second#0}" ;; esac
 
-    START_MINUTE="$((START_MINUTE * 60))"
-    START_TIME="$((START_MINUTE + START_SECOND))"
-    SECOND="$((SECOND + START_TIME))"
+    start_minute="$(($start_minute * 60))"
+    start_time="$(($start_minute + $start_second))"
+    second="$(($second + $start_time))"
 
-    until test $SECOND -lt 60; do SECOND="$((SECOND - 60))" MINUTE="$((MINUTE + 1))"; done
-    until test $MINUTE -lt 60; do MINUTE="$((MINUTE - 60))" HOUR="$((HOUR + 1))"; done
-    until test $HOUR -lt 24; do HOUR="$((HOUR - 24))" DAY="$((DAY + 1))"; done
+    until test $second -lt 60; do second="$(($second - 60))" minute="$(($minute + 1))"; done
+    until test $minute -lt 60; do minute="$(($minute - 60))" hour="$(($hour + 1))"; done
+    until test $hour -lt 24; do hour="$(($hour - 24))" day="$(($day + 1))"; done
 
-    case "$START" in
-        ([0-9]|[0-9][0-9]) DISPLAY_START="${START}s" ;;
-        ([0-9][0-9]:[0-9][0-9]) DISPLAY_START="${START}" ;;
+    case "$start" in
+        [0-9]|[0-9][0-9]) display_start="${start}s" ;;
+        [0-9][0-9]:[0-9][0-9]) display_start="$start" ;;
     esac
 
-    START="-ss $START"
-else
-    unset START DISPLAY_START
+    start="-ss $start"
 fi
 
-if [ -n "${END+x}" ]; then
-    case "$END" in
-        ([0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        (*) error "invalid end argument (hint: <MM>:<SS> or <SS>)" ;;
+if [ -n "${end+x}" ]; then
+    case "$end" in
+        [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
+        *) error "invalid end argument (hint: <mm>:<ss> or <ss>)" ;;
     esac
 
-    case "$END" in
-        (*:*) END_MINUTE="${END%:*}" END_SECOND="${END#*:}" ;;
-        (*)   END_MINUTE=0           END_SECOND="$END" ;;
+    case "$end" in
+        *:*) end_minute="${end%:*}" end_second="${end#*:}" ;;
+        *) end_minute=0 end_second="$end" ;;
     esac
 
-    case "$END_MINUTE" in (0[0-9]) END_MINUTE="${END_MINUTE#0}" ;; esac
-    case "$END_SECOND" in (0[0-9]) END_SECOND="${END_SECOND#0}" ;; esac
+    case "$end_minute" in 0[0-9]) end_minute="${end_minute#0}" ;; esac
+    case "$end_second" in 0[0-9]) end_second="${end_second#0}" ;; esac
 
-    DISPLAY_DURATION="$(($((END_MINUTE * 60)) + END_SECOND - ${START_TIME:-0}))"
+    display_duration="$(($(($end_minute * 60)) + $end_second - ${start_time:-0}))"
 
-    case "$END" in
-        ([0-9]|[0-9][0-9]) DISPLAY_END="${END}s" ;;
-        ([0-9][0-9]:[0-9][0-9]) DISPLAY_END="${END}" ;;
+    case "$end" in
+        [0-9]|[0-9][0-9]) display_end="${end}s" ;;
+        [0-9][0-9]:[0-9][0-9]) display_end="$end" ;;
     esac
 
-    END="-to $END"
-else
-    unset END DISPLAY_DURATION DISPLAY_END
+    end="-to $end"
 fi
 
-if [ -n "${ROTATE+x}" ]; then
-    case "$ROTATE" in
-        ([0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
-        (*) error "invalid rotation operand" ;;
+if [ -n "${rotate+x}" ]; then
+    case "$OPTARG" in
+        [0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
+        *) error "invalid rotation operand" ;;
     esac
-    ROTATE="-display_rotation $ROTATE"
-else
-    unset ROTATE
+    rotate="-display_rotation $OPTARG"
 fi
 
-case "$MONTH"  in ([0-9]) MONTH="0${MONTH}"   ;; esac
-case "$DAY"    in ([0-9]) DAY="0${DAY}"       ;; esac
-case "$HOUR"   in ([0-9]) HOUR="0${HOUR}"     ;; esac
-case "$MINUTE" in ([0-9]) MINUTE="0${MINUTE}" ;; esac
-case "$SECOND" in ([0-9]) SECOND="0${SECOND}" ;; esac
+case "$month" in [0-9]) month="0${month}" ;; esac
+case "$day" in [0-9]) day="0${day}" ;; esac
+case "$hour" in [0-9]) hour="0${hour}" ;; esac
+case "$minute" in [0-9]) minute="0${minute}" ;; esac
+case "$second" in [0-9]) second="0${second}" ;; esac
 
-INPUT_FILE="$INPUT_DIR/$INPUT_FILE"
-OUTPUT_FILE="$OUTPUT_DIR/${PREFIX}${YEAR}${MONTH}${DAY}_${HOUR}${MINUTE}${SECOND}${SUFFIX}"
+input_file="$input"
+output_file="${prefix}_${year}${month}${day}_${hour}${minute}${second}.${suffix}"
+case "$output_folder" in
+    \.) ;;
+    \./*) output_file="${output_folder#./}/$output_file" ;;
+    *) output_file="$output_folder/$output_file" ;;
+esac
 
-INPUT_OPTIONS="-loglevel warning -stats $ROTATE"
-OUTPUT_OPTIONS="$START $END -c copy -map_metadata -1 -async 1"
-
-if [ -n "$DISPLAY_START" -a -n "$DISPLAY_END" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %-10s%s: %s (%ss)\n\n" Input "$INPUT_FILE" Output "$OUTPUT_FILE" Start "$DISPLAY_START" End "$DISPLAY_END" "$DISPLAY_DURATION"
-elif [ -n "$DISPLAY_START" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$INPUT_FILE" Output "$OUTPUT_FILE" Start "$DISPLAY_START"
-elif [ -n "$DISPLAY_END" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$INPUT_FILE" Output "$OUTPUT_FILE" End "$DISPLAY_END"
+if [ -n "${display_start+x}" -a -n "${display_end+x}" ]; then
+    printf "\n%8s: %s\n%8s: %s\n%8s: %-10s%s: %s (%ss)\n\n" Input "$input_file" Output "$output_file" Start "$display_start" End "$display_end" "$display_duration"
+elif [ -n "${display_start+x}" ]; then
+    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file" Start "$display_start"
+elif [ -n "${display_end+x}" ]; then
+    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file" End "$display_end"
 else
-    printf "\n%8s: %s\n%8s: %s\n\n" Input "$INPUT_FILE" Output "$OUTPUT_FILE"
+    printf "\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file"
 fi
 
-if [ -z "${ASSUME_YES-}" ]; then
-    printf 'Do you want to run command? [Y/n]: '
-    read -r OPTION
-    case "$OPTION" in (''|[Yy]|[Yy][Ee][Ss]) ;; (*) exit 0 ;; esac
-    exec ffmpeg $INPUT_OPTIONS -i "$INPUT_FILE" $OUTPUT_OPTIONS "$OUTPUT_FILE"
-else
-    exec ffmpeg -y $INPUT_OPTIONS -i "$INPUT_FILE" $OUTPUT_OPTIONS "$OUTPUT_FILE"
+input_options="-loglevel warning -stats${rotate+ $rotate}${start+ $start}${end+ $end}"
+output_options="-codec copy -map_metadata -1 -async 1${assume_yes+ -y}"
+
+if [ ! -n "${assume_yes+x}" ]; then
+    printf "Do you want to run command? [Y/n]: "
+    read -r user_reply
+    case "$user_reply" in
+        ''|[Yy]|[Yy][Ee][Ss]) ;;
+        *) exit 0 ;;
+    esac
 fi
+
+exec "$media_converter" $input_options -i "$input_file" $output_options "$output_file"
