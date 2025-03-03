@@ -174,6 +174,6 @@ if [ ! -n "${assume_yes+x}" ]; then
     esac
 fi
 
-echo exec "$media_converter" \
+exec "$media_converter" \
     -loglevel warning -stats ${rotate-} ${start-} ${end-} -i "$input_file" \
     -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output_file"
