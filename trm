@@ -17,7 +17,7 @@ while getopts :hi:s:t:r:y option; do
         s) start="$OPTARG" ;;
         t) end="$OPTARG" ;;
         r) rotate="$OPTARG" ;;
-        y) assume_yes=1 ;;
+        y) assume_yes="-y" ;;
         :) error "option requires an argument -- $OPTARG" ;;
         ?) error "illegal argument -- $OPTARG" ;;
     esac
@@ -134,11 +134,11 @@ if [ -n "${end+x}" ]; then
 fi
 
 if [ -n "${rotate+x}" ]; then
-    case "$OPTARG" in
+    case "$rotate" in
         [0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
         *) error "invalid rotation operand" ;;
     esac
-    rotate="-display_rotation $OPTARG"
+    rotate="-display_rotation $rotate"
 fi
 
 case "$month" in [0-9]) month="0${month}" ;; esac
@@ -165,9 +165,6 @@ else
     printf "\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file"
 fi
 
-input_options="-loglevel warning -stats${rotate+ $rotate}${start+ $start}${end+ $end}"
-output_options="-codec copy -map_metadata -1 -async 1${assume_yes+ -y}"
-
 if [ ! -n "${assume_yes+x}" ]; then
     printf "Do you want to run command? [Y/n]: "
     read -r user_reply
@@ -177,4 +174,6 @@ if [ ! -n "${assume_yes+x}" ]; then
     esac
 fi
 
-exec "$media_converter" $input_options -i "$input_file" $output_options "$output_file"
+echo exec "$media_converter" \
+    -loglevel warning -stats ${rotate-} ${start-} ${end-} -i "$input_file" \
+    -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output_file"
