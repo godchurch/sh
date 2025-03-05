@@ -1,35 +1,53 @@
 #!/bin/sh
 
-error () { printf "%s: %s\n" "${0##*/}" "$*" >&2; exit 1; }
+set -e
 
-command -v yt-dlp > /dev/null || error "program 'yt-dlp' not found, please install it"
-command -v ffmpeg > /dev/null || error "program 'ffmpeg' not found, please install it"
+if ! downloader="$(command -p -v yt-dlp)"; then
+    printf "%s: program not found -- yt-dlp\n" "${0##*/}" 1>&2
+    exit 1
+elif ! external_downloader="$(command -p -v ffmpeg)"; then
+    printf "%s: program not found -- ffmpeg\n" "${0##*/}" 1>&2
+    exit 1
+fi
 
-while getopts :hd: OPTION; do
-    case "$OPTION" in
-        (h)
-            printf "%5s: %s [-d directory] link\n" "USAGE" "${0##*/}"
-            printf "%5s  %s -h\n" "" "${0##*/}"
+while getopts :hd: option; do
+    case "$option" in
+        h)
+            printf "%5s: %s [-d directory] link\n" "USAGE" "${0##*/}" 1>&2
+            printf "%5s  %s -h\n" "" "${0##*/}" 1>&2
             exit 0
             ;;
-        (d)
-            [ -d "$OPTARG" ] || error "directory ($OPTARG) doesn't exist"
-            cd "$OPTARG" || exit
+        d)
+            if [ ! -d "$OPTARG" ]; then
+                printf "%s: directory does not exist -- %s\n" "${0##*/}" "$OPTARG" 1>&2
+                exit 1
+            fi
+            printf "Changing directory to \`%s'\n" "$OPTARG" 1>&2
+            cd "$OPTARG"
             ;;
-        (:)
-            error "option requires an argument -- $OPTARG"
+        :)
+            printf "%s: option requires an argument -- %c\n" "${0##*/}" "$OPTARG" 1>&2
+            exit 1
             ;;
-        (?)
-            error "illegal option -- $OPTARG"
+        ?)
+            printf "%s: illegal option -- %c\n" "${0##*/}" "$OPTARG" 1>&2
+            exit 1
             ;;
     esac
 done
 shift $((OPTIND - 1))
 
-[ $# -eq 0 ] && error "missing link operand"
-[ $# -ge 2 ] && error "restricted to only one link"
-[ -w "$PWD" ] || error "write permision denied for current directory"
+if [ $# -lt 1 ]; then
+    printf "%s: missing link operand\n" "${0##*/}" 1>&2
+    exit 1
+elif [ $# -gt 1 ]; then
+    printf "%s: restricted to only one link\n" "${0##*/}" 1>&2
+    exit 1
+elif [ ! -w "$PWD" ]; then
+    printf "%s: permision denied for current directory\n" "${0##*/}" 1>&2
+    exit 1
+fi
 
-exec yt-dlp --embed-metadata \
-    --downloader ffmpeg --downloader-args ffmpeg_i:"-loglevel fatal -stats" \
+exec "$downloader" --embed-metadata \
+    --downloader "$external_downloader" --downloader-args ffmpeg_i:"-loglevel fatal -stats" \
     -o "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$1"
