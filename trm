@@ -194,5 +194,5 @@ if [ ! -n "${assume_yes+x}" ]; then
 fi
 
 exec "$media_converter" \
-    -loglevel warning -stats ${rotate-} ${start-} ${end-} -i "$input_file" \
-    -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output_file"
+    -loglevel warning -stats ${rotate-} -i "$input_file" \
+    ${start-} ${end-} -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output_file"
