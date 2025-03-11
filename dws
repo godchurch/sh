@@ -2,52 +2,17 @@
 
 set -e
 
-if ! downloader="$(command -p -v yt-dlp)"; then
-    printf "%s: program not found -- yt-dlp\n" "${0##*/}" 1>&2
+if [ $# -eq 0 ]; then
+    printf "%s: must provide at least one URL\n" "${0##*/}" 1>&2
+    exit 1
+elif ! downloader="$(command -p -v yt-dlp)"; then
+    printf "%s: command not found -- yt-dlp\n" "${0##*/}" 1>&2
     exit 1
 elif ! external_downloader="$(command -p -v ffmpeg)"; then
-    printf "%s: program not found -- ffmpeg\n" "${0##*/}" 1>&2
-    exit 1
-fi
-
-while getopts :hd: option; do
-    case "$option" in
-        h)
-            printf "%5s: %s [-d directory] link\n" "USAGE" "${0##*/}" 1>&2
-            printf "%5s  %s -h\n" "" "${0##*/}" 1>&2
-            exit 0
-            ;;
-        d)
-            if [ ! -d "$OPTARG" ]; then
-                printf "%s: directory does not exist -- %s\n" "${0##*/}" "$OPTARG" 1>&2
-                exit 1
-            fi
-            printf "Changing directory to \`%s'\n" "$OPTARG" 1>&2
-            cd "$OPTARG"
-            ;;
-        :)
-            printf "%s: option requires an argument -- %c\n" "${0##*/}" "$OPTARG" 1>&2
-            exit 1
-            ;;
-        ?)
-            printf "%s: illegal option -- %c\n" "${0##*/}" "$OPTARG" 1>&2
-            exit 1
-            ;;
-    esac
-done
-shift $((OPTIND - 1))
-
-if [ $# -lt 1 ]; then
-    printf "%s: missing link operand\n" "${0##*/}" 1>&2
-    exit 1
-elif [ $# -gt 1 ]; then
-    printf "%s: restricted to only one link\n" "${0##*/}" 1>&2
-    exit 1
-elif [ ! -w "$PWD" ]; then
-    printf "%s: permision denied for current directory\n" "${0##*/}" 1>&2
+    printf "%s: command not found -- ffmpeg\n" "${0##*/}" 1>&2
     exit 1
 fi
 
 exec "$downloader" --embed-metadata \
-    --downloader "$external_downloader" --downloader-args ffmpeg_i:"-loglevel fatal -stats" \
-    -o "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$1"
+    --downloader "$external_downloader" --downloader-args "ffmpeg_i:-loglevel fatal -stats" \
+    --output "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$@"
