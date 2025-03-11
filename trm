@@ -72,23 +72,21 @@ if [ "$input_string" = "$output_string" ]; then
     exit 1
 fi
 
-unset count prefix suffix year month day hour minute second
+unset prefix suffix year month day hour minute second
 
 string="$input_file"
-while [ "${#string}" -ge 1 ]; do
-    count="$((${count-0} + 1))"
-    modded_string="${string#?}"
-    character="${string%$modded_string}"
-    string="$modded_string"
-    case "$count" in
-        [123]) prefix="$prefix$character" ;;
-        [5678]) year="$year$character" ;;
-        9|10) month="$month$character" ;;
-        1[12]) day="$day$character" ;;
-        1[45]) hour="$hour$character" ;;
-        1[67]) minute="$minute$character" ;;
-        1[89]) second="$second$character" ;;
-        2[123]) suffix="$suffix$character" ;;
+until [ "${#string}" -eq 0 ]; do
+    character="${string%${string#?}}"
+    string="${string#?}"
+    case "${#string}" in
+        2[210]) prefix="$prefix$character" ;;
+        1[8765]) year="$year$character" ;;
+        1[43]) month="$month$character" ;;
+        1[21]) day="$day$character" ;;
+        [98]) hour="$hour$character" ;;
+        [76]) minute="$minute$character" ;;
+        [54]) second="$second$character" ;;
+        [210]) suffix="$suffix$character" ;;
     esac
 done
 
