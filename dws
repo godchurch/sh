@@ -3,14 +3,14 @@
 if [ $# -eq 0 ]; then
     printf "%s: must provide at least one URL\n" "${0##*/}" 1>&2
     exit 1
-elif ! downloader="$(command -p -v yt-dlp)"; then
+elif ! command -v yt-dlp > /dev/null; then
     printf "%s: command not found -- yt-dlp\n" "${0##*/}" 1>&2
     exit 1
-elif ! external_downloader="$(command -p -v ffmpeg)"; then
+elif ! command -v ffmpeg > /dev/null; then
     printf "%s: command not found -- ffmpeg\n" "${0##*/}" 1>&2
     exit 1
 fi
 
-exec "$downloader" --embed-metadata \
-    --downloader "$external_downloader" --downloader-args "ffmpeg_i:-loglevel fatal -stats" \
+exec yt-dlp --embed-metadata \
+    --downloader ffmpeg --downloader-args "ffmpeg_i:-loglevel fatal -stats" \
     --output "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$@"
