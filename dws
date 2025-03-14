@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ $# -eq 0 ]; then
+if [ $# -lt 1 ]; then
     printf "%s: must provide at least one URL\n" "${0##*/}" 1>&2
     exit 1
 elif ! command -v yt-dlp > /dev/null; then
@@ -11,6 +11,11 @@ elif ! command -v ffmpeg > /dev/null; then
     exit 1
 fi
 
+external_downloader="ffmpeg"
+external_arguments="ffmpeg_i:-loglevel fatal -stats"
+output_template="%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s"
+
 exec yt-dlp --embed-metadata \
-    --downloader ffmpeg --downloader-args "ffmpeg_i:-loglevel fatal -stats" \
-    --output "%(extractor)s/%(id)s/%(id)s_%(epoch-3600>%Y%m%d_%H%M%S)s.%(ext)s" "$@"
+            --downloader "$external_downloader" \
+            --downloader-args "$external_arguments" \
+            --output "$output_template" "$@"
