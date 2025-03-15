@@ -1,4 +1,3 @@
 #!/bin/sh
 
-command="$(command -p -v date)" &&
-    exec "$command" "+%n  YEAR: %Y%n MONTH: %m (%B)%n   DAY: %d (%A)%n  TIME: %r%n"
+command -p date "+%n  YEAR: %Y%n MONTH: %m (%B)%n   DAY: %d (%A)%n  TIME: %r%n"
