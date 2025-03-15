@@ -4,31 +4,16 @@
 set -e
 
 if [ $# -eq 0 ]; then
-    exec "$0" *
-elif [ $# -eq 1 ]; then
-    if [ \* = "$1" -a ! -e \* ]; then
-        printf "%s: current directory is empty\n" "${0##*/}" 1>&2
-        exit 1
-    elif [ ! -e "$1" ]; then
-        printf "%s: no such file or directory -- %s\n" "${0##*/}" "$1" 1>&2
-        exit 1
-    fi
-else
-    for pathname in "$@"; do
-        if [ ! -e "$pathname" ]; then
-            printf "%s: no such file or directory -- %s\n" "${0##*/}" "$pathname" 1>&2
-            exit 1
-        fi
-    done
+    printf "%s: requires at least one pathname\n" "${0##*/}" 1>&2
+    exit 1
 fi
 
-if ! command -p -v mv > /dev/null; then
-    printf "%s: command not found -- mv\n" "${0##*/}" 1>&2
-    exit 1
-elif ! command -p -v mkdir > /dev/null; then
-    printf "%s: command not found -- mkdir\n" "${0##*/}" 1>&2
-    exit 1
-fi
+for pathname; do
+    if [ ! -e "$pathname" ]; then
+        printf "%s: no such file or directory -- %s\n" "${0##*/}" "$pathname" 1>&2
+        exit 1
+    fi
+done
 
 IFS=' '
 case "$*" in
