@@ -1,10 +1,5 @@
 #!/bin/sh
 
-if ! monitor_control="$(command -p -v ddcutil)"; then
-    printf "%s: command not found -- ddcutil\n" "${0##*/}" 1>&2
-    exit 1
-fi
-
 unset display operation
 while getopts :hd:bvm option; do
     case "$option" in
@@ -36,17 +31,13 @@ case $# in
 esac
 
 case "${display-all}" in
-    [1-9])
-        [ "setvcp" = "$operation" ] && set -x
-        "$monitor_control" --display "$display" "$operation" "$code" "$@"
-        ;;
     all)
         [ "setvcp" = "$operation" ] && set -x
-        "$monitor_control" --display 1 "$operation" "$code" "$@"
-        "$monitor_control" --display 2 "$operation" "$code" "$@"
+        command -p ddcutil -d 1 "$operation" "$code" "$@"
+        command -p ddcutil -d 2 "$operation" "$code" "$@"
         ;;
     *)
-        printf "%s: invalid display -- %s\n" "${0##*/}" "$display" 1>&2
-        exit 1
+        [ "setvcp" = "$operation" ] && set -x
+        command -p ddcutil -d "$display" "$operation" "$code" "$@"
         ;;
 esac
