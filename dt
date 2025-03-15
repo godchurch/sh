@@ -1,8 +1,4 @@
 #!/bin/sh
 
-if ! command="$(command -p -v date)"; then
-    printf "%s: command not found -- date\n" "${0##*/}" 1>&2
-    exit 1
-fi
-
-exec "$command" "+%n  YEAR: %Y%n MONTH: %m (%B)%n   DAY: %d (%A)%n  TIME: %r%n"
+command="$(command -p -v date)" &&
+    exec "$command" "+%n  YEAR: %Y%n MONTH: %m (%B)%n   DAY: %d (%A)%n  TIME: %r%n"
