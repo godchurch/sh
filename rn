@@ -3,14 +3,6 @@
 
 set -e
 
-if ! move_files="$(command -p -v mv)"; then
-    printf "%s: command not found -- mv\n" "${0##*/}" 1>&2
-    exit 1
-elif ! make_directories="$(command -p -v mkdir)"; then
-    printf "%s: command not found -- mkdir\n" "${0##*/}" 1>&2
-    exit 1
-fi
-
 if [ $# -eq 0 ]; then
     exec "$0" *
 elif [ $# -eq 1 ]; then
@@ -28,6 +20,14 @@ else
             exit 1
         fi
     done
+fi
+
+if ! command -p -v mv > /dev/null; then
+    printf "%s: command not found -- mv\n" "${0##*/}" 1>&2
+    exit 1
+elif ! command -p -v mkdir > /dev/null; then
+    printf "%s: command not found -- mkdir\n" "${0##*/}" 1>&2
+    exit 1
 fi
 
 IFS=' '
@@ -68,9 +68,13 @@ fi
 
 until [ $# -eq 0 ]; do
     case "$2" in
-        */*) [ -d "${2%/*}" ] || "$make_directories" -p -- "${2%/*}" ;;
+        */*)
+            if [ -n "${2%/*}" ] && [ ! -d "${2%/*}" ]; then
+                command -p mkdir -p -- "${2%/*}"
+            fi
+            ;;
     esac
-    "$move_files" -- "$1" "$2"
+    command -p mv -- "$1" "$2"
     shift 2
 done
 
