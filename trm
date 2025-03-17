@@ -2,91 +2,94 @@
 
 set -e
 
-usage="Usage: %s -i VID_XXXXXXXX_XXXXXX.mp4 [-s [mm:]ss] [-t [mm:]ss] [-r rotation] [directory]"
+usage="Usage: ${0##*/} [-d directory] [-s [mm:]ss] [-t [mm:]ss] [-r rotation] VID_XXXXXXXX_XXXXXX.mp4"
 
-if ! media_converter="$(command -p -v ffmpeg)"; then
-    printf "%s: command not found -- ffmpeg\n" "${0##*/}" 1>&2
-    exit 1
-fi
+exit_shell ()
+{
+    exit_code="$1"; shift 1
+    case "$exit_code" in
+        0) printf "%s\n" "$*" ;;
+        *) printf "%s\n" "$*" 1>&2 ;;
+    esac
+    exit "$exit_code"
+}
 
-unset input rotate assume_yes start display_start end display_duration display_end
-while getopts :hi:s:t:r:y option; do
+media_converter="$(command -p -v ffmpeg)" ||
+    exit_shell 127 "${0##*/}: command not found -- ffmpeg"
+
+unset directory rotate assume_yes start display_start end display_duration display_end
+while getopts :hd:s:t:r:y option; do
     case "$option" in
-        h) printf "$usage\n" "${0##*/}" 1>&2; exit 0 ;;
-        i) input="$OPTARG" ;;
+        h) exit_shell 0 "$usage" ;;
+        d) directory="$OPTARG" ;;
         s) start="$OPTARG" ;;
         t) end="$OPTARG" ;;
         r) rotate="$OPTARG" ;;
         y) assume_yes="-y" ;;
-        :) printf "%s: option requires an argument -- %c\n" "${0##*/}" "$OPTARG" 1>&2; exit 1 ;;
-        ?) printf "%s: illegal argument -- %c\n" "${0##*/}" "$OPTARG" 1>&2; exit 1 ;;
+        :) exit_shell 1 "${0##*/}: option requires an argument -- $OPTARG" ;;
+        \?) exit_shell 1 "${0##*/}: illegal argument -- $OPTARG" ;;
     esac
 done
 shift $(($OPTIND - 1))
 
-if [ $# -gt 1 ]; then
-    printf "%s: too many directory operands\n" "${0##*/}" 1>&2
-    exit 1
-elif [ $# -lt 1 ]; then
-    set -- '.'
+if [ $# -eq 1 ]; then
+    [ -e "$1" ] || exit_shell 1 "${0##*/}: file does not exist -- $1"
+    [ -f "$1" ] || exit_shell 1 "${0##*/}: file is not a regular file -- $1"
+    [ -r "$1" ] || exit_shell 1 "${0##*/}: unable to read file -- $1"
+else
+    [ $# -lt 1 ] && exit_shell 1 "${0##*/}: missing file operand"
+    [ $# -gt 1 ] && exit_shell 1 "${0##*/}: too many file operands"
 fi
 
-if [ ! -n "${input+x}" ]; then
-    printf "%s: input file not specified\n" "${0##*/}" 1>&2
-    exit 1
-elif [ ! -f "$input" ]; then
-    printf "%s: file does not exist or is not a regular file -- %s\n" "${0##*/}" "$input" 1>&2
-    exit 1
-elif [ ! -r "$input" ]; then
-    printf "%s: unable to read file -- %s\n" "${0##*/}" "$input" 1>&2
-    exit 1
-fi
-
-case "${input##*/}" in
-    VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4) ;;
-    *) printf "%s: invalid file operand\n" "${0##*/}" 1>&2; exit 1 ;;
-esac
-
-case "$input" in
-    */*) input_folder="${input%/*}" input_file="${input##*/}" ;;
-    *) input_folder="." input_file="$input" ;;
-esac
-
-if [ ! -d "$1" ]; then
-    printf "%s: directory does not exist or is not a directory\n" "${0##*}" 1>&2
-    exit 1
-elif [ ! -w "$1" ]; then
-    printf "%s: permission denied for output directory\n" "${0##*}" 1>&2
-    exit 1
-fi
+pattern_check () { case "$2" in $1) : ;; *) ! : ;; esac; }
+pattern="VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4"
+pattern_check "$pattern" "${1##*/}" || exit_shell 1 "${0##*/}: invalid file operand -- $1"
 
 case "$1" in
-    /) output_folder="$1" ;;
-    *) output_folder="${1%/}" ;;
+    ./*/*) set -- "${1#./}"; set -- "${1%/*}" "${1##*/}" ;;
+    ./*) set -- "." "${1#./}" ;;
+    /*/*) set -- "${1%/*}" "${1##*/}" ;;
+    /*) set -- "/" "${1##*/}" ;;
+    */*) set -- "${1%/*}" "${1##*/}" ;;
+    *) set -- "." "$1" ;;
 esac
 
-input_string="$(cd "$input_folder" && pwd)"
-output_string="$(cd "$output_folder" && pwd)"
+if [ -n "${directory+x}" ]; then
+    case "$directory" in
+        /) set -- "$1" "$2" "/" ;;
+        ./) set -- "$1" "$2" "." ;;
+        ./*) set -- "$1" "$2" "${directory#./}"; set -- "$1" "$2" "${3%/}" ;;
+        *) set -- "$1" "$2" "${directory%/}" ;;
+    esac
+    [ -e "$3" ] || exit_shell 1 "${0##*/}: specified directory does not exist -- $3"
+    [ -d "$3" ] || exit_shell 1 "${0##*/}: specified directory is not a directory -- $3"
+    [ -w "$3" ] || exit_shell 1 "${0##*/}: write permission denied -- $3"
+else
+    set -- "$1" "$2" "."
+    [ -w "$3" ] || exit_shell 1 "${0##*/}: write permission denied for current directory"
+fi
+
+input_string="$(cd "$1" && pwd)"
+output_string="$(cd "$3" && pwd)"
 if [ "$input_string" = "$output_string" ]; then
-    printf "%s: input can not be in output directory\n" "${0##*/}" 1>&2
-    exit 1
+    exit_shell 1 "${0##*/}: input can not be inside of output directory"
 fi
 
 unset prefix suffix year month day hour minute second
 
-string="$input_file"
+string="$2"
 until [ "${#string}" -eq 0 ]; do
     character="${string%${string#?}}"
     string="${string#?}"
     case "${#string}" in
-        2[210]) prefix="$prefix$character" ;;
-        1[8765]) year="$year$character" ;;
-        1[43]) month="$month$character" ;;
-        1[21]) day="$day$character" ;;
-        [98]) hour="$hour$character" ;;
-        [76]) minute="$minute$character" ;;
-        [54]) second="$second$character" ;;
-        [210]) suffix="$suffix$character" ;;
+        2[210]) prefix="${prefix-}$character" ;;
+        1[8765]) year="${year-}$character" ;;
+        1[43]) month="${month-}$character" ;;
+        1[21]) day="${day-}$character" ;;
+        [98]) hour="${hour-}$character" ;;
+        [76]) minute="${minute-}$character" ;;
+        [54]) second="${second-}$character" ;;
+        [210]) suffix="${suffix-}$character" ;;
     esac
 done
 
@@ -99,7 +102,7 @@ case "$second" in 0[0-9]) second="${second#0}" ;; esac
 if [ -n "${start+x}" ]; then
     case "$start" in
         [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        *) printf "%s: invalid start operand\n" "${0##*/}" 1>&2; exit 1 ;;
+        *) exit_shell 1 "${0##*/}: invalid start operand -- $start" ;;
     esac
 
     case "$start" in
@@ -129,7 +132,7 @@ fi
 if [ -n "${end+x}" ]; then
     case "$end" in
         [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        *) printf "%s: invalid end operand\n" "${0##*/}" 1>&2; exit 1 ;;
+        *) exit_shell 1 "${0##*/}: invalid end operand -- $end" ;;
     esac
 
     case "$end" in
@@ -153,7 +156,7 @@ fi
 if [ -n "${rotate+x}" ]; then
     case "$rotate" in
         [0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
-        *) printf "%s: invalid rotation operand\n" "${0##*/}" 1>&2; exit 1 ;;
+        *) exit_shell 1 "${0##*/}: invalid rotation operand -- $rotate" ;;
     esac
     rotate="-display_rotation $rotate"
 fi
@@ -164,22 +167,26 @@ case "$hour" in [0-9]) hour="0${hour}" ;; esac
 case "$minute" in [0-9]) minute="0${minute}" ;; esac
 case "$second" in [0-9]) second="0${second}" ;; esac
 
-input_file="$input"
-output_file="${prefix}_${year}${month}${day}_${hour}${minute}${second}.${suffix}"
-case "$output_folder" in
-    \.) ;;
-    \./*) output_file="${output_folder#./}/$output_file" ;;
-    *) output_file="$output_folder/$output_file" ;;
+case "$1" in
+    .) input="$2" ;;
+    /) input="/$2" ;;
+    *) input="$1/$2" ;;
+esac
+set -- "$1" "$2" "$3" "${prefix}_${year}${month}${day}_${hour}${minute}${second}.${suffix}"
+case "$3" in
+    .) output="$4" ;;
+    /) output="/$4" ;;
+    *) output="$3/$4" ;;
 esac
 
 if [ -n "${display_start+x}" -a -n "${display_end+x}" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %-10s%s: %s (%ss)\n\n" Input "$input_file" Output "$output_file" Start "$display_start" End "$display_end" "$display_duration"
+    printf "\n%8s: %s\n%8s: %s\n%8s: %-10s%s: %s (%ss)\n\n" Input "$input" Output "$output" Start "$display_start" End "$display_end" "$display_duration"
 elif [ -n "${display_start+x}" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file" Start "$display_start"
+    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input" Output "$output" Start "$display_start"
 elif [ -n "${display_end+x}" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file" End "$display_end"
+    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input" Output "$output" End "$display_end"
 else
-    printf "\n%8s: %s\n%8s: %s\n\n" Input "$input_file" Output "$output_file"
+    printf "\n%8s: %s\n%8s: %s\n\n" Input "$input" Output "$output"
 fi
 
 if [ ! -n "${assume_yes+x}" ]; then
@@ -192,5 +199,5 @@ if [ ! -n "${assume_yes+x}" ]; then
 fi
 
 exec "$media_converter" \
-    -loglevel warning -stats ${rotate-} -i "$input_file" \
-    ${start-} ${end-} -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output_file"
+    -loglevel warning -stats ${rotate-} -i "$input" \
+    ${start-} ${end-} -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output"
