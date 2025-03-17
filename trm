@@ -2,20 +2,21 @@
 
 set -e
 
-usage="Usage: ${0##*/} [-d directory] [-s [mm:]ss] [-t [mm:]ss] [-r rotation] VID_XXXXXXXX_XXXXXX.mp4"
+program="${0##*/}"
+usage="Usage: $program [-d directory] [-s [mm:]ss] [-t [mm:]ss] [-r rotation] VID_XXXXXXXX_XXXXXX.mp4"
 
 exit_shell ()
 {
-    exit_code="$1"; shift 1
+    exit_status="$1"; shift 1
     case "$exit_code" in
         0) printf "%s\n" "$*" ;;
         *) printf "%s\n" "$*" 1>&2 ;;
     esac
-    exit "$exit_code"
+    exit "$exit_status"
 }
 
 media_converter="$(command -p -v ffmpeg)" ||
-    exit_shell 127 "${0##*/}: command not found -- ffmpeg"
+    exit_shell 127 "$program: command not found -- ffmpeg"
 
 unset directory rotate assume_yes start display_start end display_duration display_end
 while getopts :hd:s:t:r:y option; do
@@ -26,24 +27,24 @@ while getopts :hd:s:t:r:y option; do
         t) end="$OPTARG" ;;
         r) rotate="$OPTARG" ;;
         y) assume_yes="-y" ;;
-        :) exit_shell 1 "${0##*/}: option requires an argument -- $OPTARG" ;;
-        \?) exit_shell 1 "${0##*/}: illegal argument -- $OPTARG" ;;
+        :) exit_shell 1 "$program: option requires an argument -- $OPTARG" ;;
+        \?) exit_shell 1 "$program: illegal argument -- $OPTARG" ;;
     esac
 done
 shift $(($OPTIND - 1))
 
 if [ $# -eq 1 ]; then
-    [ -e "$1" ] || exit_shell 1 "${0##*/}: file does not exist -- $1"
-    [ -f "$1" ] || exit_shell 1 "${0##*/}: file is not a regular file -- $1"
-    [ -r "$1" ] || exit_shell 1 "${0##*/}: unable to read file -- $1"
+    [ -e "$1" ] || exit_shell 1 "$program: file does not exist -- $1"
+    [ -f "$1" ] || exit_shell 1 "$program: file is not a regular file -- $1"
+    [ -r "$1" ] || exit_shell 1 "$program: unable to read file -- $1"
 else
-    [ $# -lt 1 ] && exit_shell 1 "${0##*/}: missing file operand"
-    [ $# -gt 1 ] && exit_shell 1 "${0##*/}: too many file operands"
+    [ $# -lt 1 ] && exit_shell 1 "$program: missing file operand"
+    [ $# -gt 1 ] && exit_shell 1 "$program: too many file operands"
 fi
 
 pattern_check () { case "$2" in $1) : ;; *) ! : ;; esac; }
 pattern="VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4"
-pattern_check "$pattern" "${1##*/}" || exit_shell 1 "${0##*/}: invalid file operand -- $1"
+pattern_check "$pattern" "${1##*/}" || exit_shell 1 "$program: invalid file operand -- $1"
 
 case "$1" in
     ./*/*) set -- "${1#./}"; set -- "${1%/*}" "${1##*/}" ;;
@@ -61,18 +62,18 @@ if [ -n "${directory+x}" ]; then
         ./*) set -- "$1" "$2" "${directory#./}"; set -- "$1" "$2" "${3%/}" ;;
         *) set -- "$1" "$2" "${directory%/}" ;;
     esac
-    [ -e "$3" ] || exit_shell 1 "${0##*/}: specified directory does not exist -- $3"
-    [ -d "$3" ] || exit_shell 1 "${0##*/}: specified directory is not a directory -- $3"
-    [ -w "$3" ] || exit_shell 1 "${0##*/}: write permission denied -- $3"
+    [ -e "$3" ] || exit_shell 1 "$program: specified directory does not exist -- $3"
+    [ -d "$3" ] || exit_shell 1 "$program: specified directory is not a directory -- $3"
+    [ -w "$3" ] || exit_shell 1 "$program: write permission denied -- $3"
 else
     set -- "$1" "$2" "."
-    [ -w "$3" ] || exit_shell 1 "${0##*/}: write permission denied for current directory"
+    [ -w "$3" ] || exit_shell 1 "$program: write permission denied for current directory"
 fi
 
 input_string="$(cd "$1" && pwd)"
 output_string="$(cd "$3" && pwd)"
 if [ "$input_string" = "$output_string" ]; then
-    exit_shell 1 "${0##*/}: input can not be inside of output directory"
+    exit_shell 1 "$program: input can not be inside of output directory"
 fi
 
 unset prefix suffix year month day hour minute second
@@ -102,7 +103,7 @@ case "$second" in 0[0-9]) second="${second#0}" ;; esac
 if [ -n "${start+x}" ]; then
     case "$start" in
         [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        *) exit_shell 1 "${0##*/}: invalid start operand -- $start" ;;
+        *) exit_shell 1 "$program: invalid start operand -- $start" ;;
     esac
 
     case "$start" in
@@ -117,9 +118,9 @@ if [ -n "${start+x}" ]; then
     start_time="$(($start_minute + $start_second))"
     second="$(($second + $start_time))"
 
-    until test $second -lt 60; do second="$(($second - 60))" minute="$(($minute + 1))"; done
-    until test $minute -lt 60; do minute="$(($minute - 60))" hour="$(($hour + 1))"; done
-    until test $hour -lt 24; do hour="$(($hour - 24))" day="$(($day + 1))"; done
+    until [ $second -lt 60 ]; do second="$(($second - 60))" minute="$(($minute + 1))"; done
+    until [ $minute -lt 60 ]; do minute="$(($minute - 60))" hour="$(($hour + 1))"; done
+    until [ $hour -lt 24 ]; do hour="$(($hour - 24))" day="$(($day + 1))"; done
 
     case "$start" in
         [0-9]|[0-9][0-9]) display_start="${start}s" ;;
@@ -132,7 +133,7 @@ fi
 if [ -n "${end+x}" ]; then
     case "$end" in
         [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        *) exit_shell 1 "${0##*/}: invalid end operand -- $end" ;;
+        *) exit_shell 1 "$program: invalid end operand -- $end" ;;
     esac
 
     case "$end" in
@@ -156,7 +157,7 @@ fi
 if [ -n "${rotate+x}" ]; then
     case "$rotate" in
         [0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
-        *) exit_shell 1 "${0##*/}: invalid rotation operand -- $rotate" ;;
+        *) exit_shell 1 "$program: invalid rotation operand -- $rotate" ;;
     esac
     rotate="-display_rotation $rotate"
 fi
