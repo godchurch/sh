@@ -1,29 +1,37 @@
 #!/bin/sh
 
-[ $# -ge 1 ] || exit 0
+case $# in
+    0)
+        ;;
+    *)
+        number_of_arguments=$#
+        for argument; do
+            case "$argument" in
+                *\'*)
+                    new_argument=
+                    while
+                        case "${#argument}" in
+                            0) ! : ;;
+                            *) : ;;
+                        esac
+                    do
+                        character="${argument%${argument#?}}"
+                        argument="${argument#?}"
+                        case "$character" in
+                            \') new_argument="$new_argument'\\$character'" ;;
+                            *) new_argument="$new_argument$character" ;;
+                        esac
+                    done
+                    set -- "$@" "'$new_argument'"
+                    ;;
+                *)
+                    set -- "$@" "'$argument'"
+                    ;;
+            esac
+        done
+        shift "$number_of_arguments"
 
-IFS=' '
-
-number_of_arguments=$#
-for argument; do
-    case "$argument" in
-        *\'*)
-            new_argument=
-            while [ "${#argument}" -ge 1 ]; do
-                character="${argument%${argument#?}}"
-                argument="${argument#?}"
-                case "$character" in
-                    \') new_argument="$new_argument'\\$character'" ;;
-                    *) new_argument="$new_argument$character" ;;
-                esac
-            done
-            set -- "$@" "'$new_argument'"
-            ;;
-        *)
-            set -- "$@" "'$argument'"
-            ;;
-    esac
-done
-shift "$number_of_arguments"
-
-printf " %s\n" "$*"
+        IFS=' '
+        printf " %s\n" "$*"
+        ;;
+esac
