@@ -1,43 +1,52 @@
 #!/bin/sh
 
-unset display operation
-while getopts :hd:bvm option; do
+usage () {
+    printf "%s\n" "Usage: ${0##*/} [-h] -b|-v|-m [-d display] [arguments]" >&2
+    exit "$1"
+}
+die () {
+    printf "%s\n" "$2" >&2
+    exit "$1"
+}
+
+PATH=$(command -p getconf PATH) || exit $?
+
+unset -v display
+unset -v operation
+while getopts ":hd:bvm" option; do
     case "$option" in
-        h) printf "Usage: %s [-d display] [-b|-v|-m] [arguments]\n" "${0##*/}" >&2; exit 0 ;;
+        h) usage 0 ;;
         d) display="$OPTARG" ;;
-        b) operation="brightness" ;;
-        v) operation="volume" ;;
-        m) operation="mute" ;;
-        :) printf "%s: option requires an argument -- %c\n" "${0##*/}" "$OPTARG" 1>&2; exit 1 ;;
-        ?) printf "%s: illegal option -- %c\n" "${0##*/}" "$OPTARG" 1>&2; exit 1 ;;
+        b) operation=brightness ;;
+        v) operation=volume ;;
+        m) operation=mute ;;
+        :) die 1 "${0##*/}: option requires an argument -- $OPTARG" ;;
+        ?) die 1 "${0##*/}: illegal option -- $OPTARG" ;;
     esac
 done
 shift $(($OPTIND - 1))
 
-if [ ! -n "${operation+x}" ]; then
-    printf "%s: no operation flags specified\n" "${0##*/}" 1>&2
-    exit 1
-fi
-
-case "$operation" in
-    brightness) code="0x10" ;;
-    volume) code="0x62" ;;
-    mute) code="0x8d" ;;
-esac
+[ -z "${operation-}" ] && usage 1
 
 case $# in
-    0) operation="getvcp" ;;
-    *) operation="setvcp" ;;
+    0) primary=getvcp ;;
+    *) primary=setvcp ;;
 esac
 
-case "${display-all}" in
-    all)
-        [ "setvcp" = "$operation" ] && set -x
-        command -p ddcutil -d 1 "$operation" "$code" "$@"
-        command -p ddcutil -d 2 "$operation" "$code" "$@"
+case "$operation" in
+    brightness) code=0x10 ;;
+    volume) code=0x62 ;;
+    mute) code=0x8d ;;
+esac
+
+case "${display+X}" in
+    X)
+        [ "$primary" = setvcp ] && set -x
+        ddcutil -d "$display" "$primary" "$code" "$@"
         ;;
     *)
-        [ "setvcp" = "$operation" ] && set -x
-        command -p ddcutil -d "$display" "$operation" "$code" "$@"
+        [ "$primary" = setvcp ] && set -x
+        ddcutil -d 1 "$primary" "$code" "$@"
+        ddcutil -d 2 "$primary" "$code" "$@"
         ;;
 esac
