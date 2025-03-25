@@ -1,4 +1,5 @@
 #!/bin/sh
 
 PATH=$(command -p getconf PATH) || exit $?
+
 exec date "+%n  YEAR: %Y%n MONTH: %m (%B)%n   DAY: %d (%A)%n  TIME: %r%n"
