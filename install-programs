@@ -2,6 +2,8 @@
 
 set -e
 
+PATH="$(command -p getconf PATH)"
+
 id="$(id -u)"
 if [ "$id" -ne 0 ]; then
     printf "%s: permission denied\n" "${0##*/}" >&2
@@ -10,7 +12,7 @@ fi
 
 shift $#
 while read -r package description; do
-    if [ -n "$package" ]; then set -- "$@" "$package"; fi
+    [ -z "$package" ] || set -- "$@" "$package"
 done << PACKAGES
     neovim    # Heavily refactored vim fork
     tmux      # Terminal multiplexer
