@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/usr/bin/sh
 
-PATH="$(command -p getconf PATH)" || exit $?
+PATH="/usr/bin"
 
 while getopts ":EF" option; do
     case "$option" in

@@ -9,9 +9,7 @@ quit () {
     exit "$1"
 }
 
-if [ ! -x /usr/bin/ddcutil ]; then
-    quit 127 "'/usr/bin/ddcutil' doen't exist or is not executable"
-fi
+PATH="/usr/bin"
 
 unset -v display
 unset -v operation
@@ -44,11 +42,11 @@ esac
 case "${display+X}" in
     X)
         [ "$primary" = setvcp ] && set -x
-        /usr/bin/ddcutil -d "$display" "$primary" "$code" "$@"
+        ddcutil -d "$display" "$primary" "$code" "$@"
         ;;
     *)
         [ "$primary" = setvcp ] && set -x
-        /usr/bin/ddcutil -d 1 "$primary" "$code" "$@"
-        /usr/bin/ddcutil -d 2 "$primary" "$code" "$@"
+        ddcutil -d 1 "$primary" "$code" "$@"
+        ddcutil -d 2 "$primary" "$code" "$@"
         ;;
 esac

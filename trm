@@ -18,7 +18,7 @@ quit () {
     exit 1
 }
 
-PATH="$(command -p getconf PATH)"
+PATH="/usr/bin"
 
 unset -v folder assume_yes
 unset -v start end rotate
