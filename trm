@@ -1,84 +1,85 @@
-#!/bin/sh
+#!/usr/bin/sh
 
-set -e
+set -eu
 
-program="${0##*/}"
-usage="Usage: $program [-d directory] [-s [mm:]ss] [-t [mm:]ss] [-r rotation] VID_XXXXXXXX_XXXXXX.mp4"
-
-exit_shell ()
-{
-    exit_status="$1"; shift 1
-    case "$exit_code" in
-        0) printf "%s\n" "$*" ;;
-        *) printf "%s\n" "$*" 1>&2 ;;
-    esac
-    exit "$exit_status"
+usage () {
+    printf "Usage: %s" "${0##*/}" >&2
+    printf " [-h]" >&2
+    printf " [-d directory]" >&2
+    printf " [-s [mm:]ss]" >&2
+    printf " [-t [mm:]ss]" >&2
+    printf " [-r rotation]" >&2
+    printf " VID_XXXXXXXX_XXXXXX.mp4" >&2
+    printf "\n" >&2
+    exit 0
+}
+quit () {
+    printf "%s: %s\n" "${0##*/}" "$*" >&2
+    exit 1
 }
 
-media_converter="$(command -p -v ffmpeg)" ||
-    exit_shell 127 "$program: command not found -- ffmpeg"
+PATH="$(command -p getconf PATH)"
 
-unset directory rotate assume_yes start display_start end display_duration display_end
-while getopts :hd:s:t:r:y option; do
+unset -v folder assume_yes
+unset -v start end rotate
+unset -v echo_start echo_end
+
+while getopts ":hyd:s:t:r:" option; do
     case "$option" in
-        h) exit_shell 0 "$usage" ;;
-        d) directory="$OPTARG" ;;
+        h) usage ;;
+        y) assume_yes="-y" ;;
+        d) folder="$OPTARG" ;;
         s) start="$OPTARG" ;;
         t) end="$OPTARG" ;;
         r) rotate="$OPTARG" ;;
-        y) assume_yes="-y" ;;
-        :) exit_shell 1 "$program: option requires an argument -- $OPTARG" ;;
-        \?) exit_shell 1 "$program: illegal argument -- $OPTARG" ;;
+        :) quit "option requires an argument -- $OPTARG" ;;
+        ?) quit "illegal argument -- $OPTARG" ;;
     esac
 done
 shift $(($OPTIND - 1))
 
 if [ $# -eq 1 ]; then
-    [ -e "$1" ] || exit_shell 1 "$program: file does not exist -- $1"
-    [ -f "$1" ] || exit_shell 1 "$program: file is not a regular file -- $1"
-    [ -r "$1" ] || exit_shell 1 "$program: unable to read file -- $1"
+    [ -e "$1" ] || quit "file does not exist -- $1"
+    [ -f "$1" ] || quit "file is not a regular file -- $1"
+    [ -r "$1" ] || quit "unable to read file -- $1"
 else
-    [ $# -lt 1 ] && exit_shell 1 "$program: missing file operand"
-    [ $# -gt 1 ] && exit_shell 1 "$program: too many file operands"
+    [ $# -lt 1 ] && quit "missing file operand"
+    [ $# -gt 1 ] && quit "too many file operands"
 fi
 
-pattern_check () { case "$2" in $1) : ;; *) ! : ;; esac; }
-pattern="VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4"
-pattern_check "$pattern" "${1##*/}" || exit_shell 1 "$program: invalid file operand -- $1"
+input="$(realpath -- "$1")"
+in_file=$(basename -- "$input")
+in_folder=$(dirname -- "$input")
 
-case "$1" in
-    ./*/*) set -- "${1#./}"; set -- "${1%/*}" "${1##*/}" ;;
-    ./*) set -- "." "${1#./}" ;;
-    /*/*) set -- "${1%/*}" "${1##*/}" ;;
-    /*) set -- "/" "${1##*/}" ;;
-    */*) set -- "${1%/*}" "${1##*/}" ;;
-    *) set -- "." "$1" ;;
+pattern='VID_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].mp4'
+case "$in_file" in
+    $pattern) ;;
+           *) quit "invalid file operand -- $input" ;;
 esac
 
-if [ -n "${directory+x}" ]; then
-    case "$directory" in
-        /) set -- "$1" "$2" "/" ;;
-        ./) set -- "$1" "$2" "." ;;
-        ./*) set -- "$1" "$2" "${directory#./}"; set -- "$1" "$2" "${3%/}" ;;
-        *) set -- "$1" "$2" "${directory%/}" ;;
-    esac
-    [ -e "$3" ] || exit_shell 1 "$program: specified directory does not exist -- $3"
-    [ -d "$3" ] || exit_shell 1 "$program: specified directory is not a directory -- $3"
-    [ -w "$3" ] || exit_shell 1 "$program: write permission denied -- $3"
-else
-    set -- "$1" "$2" "."
-    [ -w "$3" ] || exit_shell 1 "$program: write permission denied for current directory"
-fi
+case "${folder+X}" in
+    X)
+        [ -e "$folder" ] || quit "directory does not exist -- $folder"
+        [ -d "$folder" ] || quit "directory is not a directory -- $folder"
+        [ -w "$folder" ] || quit "write permission denied -- $folder"
+        ;;
+    *)
+        [ -w . ] || quit "write permission denied for current directory"
+        folder="."
+        ;;
+esac
 
-input_string="$(cd "$1" && pwd)"
-output_string="$(cd "$3" && pwd)"
-if [ "$input_string" = "$output_string" ]; then
-    exit_shell 1 "$program: input can not be inside of output directory"
-fi
+out_folder="$(realpath -- "$folder")"
 
-unset prefix suffix year month day hour minute second
+case "$out_folder" in
+    "$in_folder") quit "input can not be inside of output directory" ;;
+esac
 
-string="$2"
+unset -v prefix suffix
+unset -v year month day
+unset -v hour minute second
+
+string="$in_file"
 until [ "${#string}" -eq 0 ]; do
     character="${string%${string#?}}"
     string="${string#?}"
@@ -94,111 +95,97 @@ until [ "${#string}" -eq 0 ]; do
     esac
 done
 
-case "$month" in 0[0-9]) month="${month#0}" ;; esac
-case "$day" in 0[0-9]) day="${day#0}" ;; esac
-case "$hour" in 0[0-9]) hour="${hour#0}" ;; esac
-case "$minute" in 0[0-9]) minute="${minute#0}" ;; esac
-case "$second" in 0[0-9]) second="${second#0}" ;; esac
+case "$month" in 0?) month="${month#0}" ;; esac
+case "$day" in 0?) day="${day#0}" ;; esac
+case "$hour" in 0?) hour="${hour#0}" ;; esac
+case "$minute" in 0?) minute="${minute#0}" ;; esac
+case "$second" in 0?) second="${second#0}" ;; esac
 
-if [ -n "${start+x}" ]; then
-    case "$start" in
-        [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        *) exit_shell 1 "$program: invalid start operand -- $start" ;;
-    esac
+case "${start+X}" in
+    X)
+        case "$start" in
+            [0-9]) echo_start="00:0$start" ;;
+            [0-5][0-9]) echo_start="00:$start" ;;
+            [0-5][0-9]:[0-5][0-9]) echo_start="$start" ;;
+            *) quit "invalid start operand -- $start" ;;
+        esac
 
-    case "$start" in
-        *:*) start_minute="${start%:*}" start_second="${start#*:}" ;;
-        *) start_minute=0 start_second="$start" ;;
-    esac
+        start="-ss $echo_start"
+        start_minute="${echo_start%:*}"
+        start_second="${echo_start#*:}"
 
-    case "$start_minute" in 0[0-9]) start_minute="${start_minute#0}" ;; esac
-    case "$start_second" in 0[0-9]) start_second="${start_second#0}" ;; esac
+        case "$start_minute" in 0?) start_minute="${start_minute#0}" ;; esac
+        case "$start_second" in 0?) start_second="${start_second#0}" ;; esac
 
-    start_minute="$(($start_minute * 60))"
-    start_time="$(($start_minute + $start_second))"
-    second="$(($second + $start_time))"
-
-    until [ $second -lt 60 ]; do second="$(($second - 60))" minute="$(($minute + 1))"; done
-    until [ $minute -lt 60 ]; do minute="$(($minute - 60))" hour="$(($hour + 1))"; done
-    until [ $hour -lt 24 ]; do hour="$(($hour - 24))" day="$(($day + 1))"; done
-
-    case "$start" in
-        [0-9]|[0-9][0-9]) display_start="${start}s" ;;
-        [0-9][0-9]:[0-9][0-9]) display_start="$start" ;;
-    esac
-
-    start="-ss $start"
-fi
-
-if [ -n "${end+x}" ]; then
-    case "$end" in
-        [0-9]|[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
-        *) exit_shell 1 "$program: invalid end operand -- $end" ;;
-    esac
-
-    case "$end" in
-        *:*) end_minute="${end%:*}" end_second="${end#*:}" ;;
-        *) end_minute=0 end_second="$end" ;;
-    esac
-
-    case "$end_minute" in 0[0-9]) end_minute="${end_minute#0}" ;; esac
-    case "$end_second" in 0[0-9]) end_second="${end_second#0}" ;; esac
-
-    display_duration="$(($(($end_minute * 60)) + $end_second - ${start_time:-0}))"
-
-    case "$end" in
-        [0-9]|[0-9][0-9]) display_end="${end}s" ;;
-        [0-9][0-9]:[0-9][0-9]) display_end="$end" ;;
-    esac
-
-    end="-to $end"
-fi
-
-if [ -n "${rotate+x}" ]; then
-    case "$rotate" in
-        [0-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|360) ;;
-        *) exit_shell 1 "$program: invalid rotation operand -- $rotate" ;;
-    esac
-    rotate="-display_rotation $rotate"
-fi
-
-case "$month" in [0-9]) month="0${month}" ;; esac
-case "$day" in [0-9]) day="0${day}" ;; esac
-case "$hour" in [0-9]) hour="0${hour}" ;; esac
-case "$minute" in [0-9]) minute="0${minute}" ;; esac
-case "$second" in [0-9]) second="0${second}" ;; esac
-
-case "$1" in
-    .) input="$2" ;;
-    /) input="/$2" ;;
-    *) input="$1/$2" ;;
-esac
-set -- "$1" "$2" "$3" "${prefix}_${year}${month}${day}_${hour}${minute}${second}.${suffix}"
-case "$3" in
-    .) output="$4" ;;
-    /) output="/$4" ;;
-    *) output="$3/$4" ;;
+        second=$(($start_minute * 60 + $start_second + $second))
+        while [ $second -ge 60 ]; do second=$(($second - 60)) minute=$(($minute + 1)); done
+        while [ $minute -ge 60 ]; do minute=$(($minute - 60)) hour=$(($hour + 1)); done
+        while [ $hour -ge 24 ]; do hour=$(($hour - 24)) day=$(($day + 1)); done
+        ;;
 esac
 
-if [ -n "${display_start+x}" -a -n "${display_end+x}" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %-10s%s: %s (%ss)\n\n" Input "$input" Output "$output" Start "$display_start" End "$display_end" "$display_duration"
-elif [ -n "${display_start+x}" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input" Output "$output" Start "$display_start"
-elif [ -n "${display_end+x}" ]; then
-    printf "\n%8s: %s\n%8s: %s\n%8s: %s\n\n" Input "$input" Output "$output" End "$display_end"
-else
-    printf "\n%8s: %s\n%8s: %s\n\n" Input "$input" Output "$output"
-fi
+case "${end+X}" in
+    X)
+        case "$end" in
+            [0-9]) echo_end="00:0$end" ;;
+            [0-5][0-9]) echo_end="00:$end" ;;
+            [0-5][0-9]:[0-5][0-9]) echo_end="$end" ;;
+            *) quit "invalid end operand -- $end" ;;
+        esac
+        end="-to $echo_end"
+        ;;
+esac
 
-if [ ! -n "${assume_yes+x}" ]; then
-    printf "Do you want to run command? [Y/n]: "
-    read -r user_reply
-    case "$user_reply" in
-        ''|[Yy]|[Yy][Ee][Ss]) ;;
-        *) exit 0 ;;
-    esac
-fi
+case "${rotate+X}" in
+    X)
+        case "$rotate" in
+            [0-9]) ;;
+            [1-9][0-9]) ;;
+            [12][0-9][0-9]) ;;
+            3[0-5][0-9]) ;;
+            *) quit "invalid rotation operand -- $rotate" ;;
+        esac
+        rotate="-display_rotation $rotate"
+        ;;
+esac
 
-exec "$media_converter" \
-    -loglevel warning -stats ${rotate-} -i "$input" \
-    ${start-} ${end-} -codec copy -map_metadata -1 -async 1 ${assume_yes-} "$output"
+case "$month" in ?) month="0$month" ;; esac
+case "$day" in ?) day="0$day" ;; esac
+case "$hour" in ?) hour="0$hour" ;; esac
+case "$minute" in ?) minute="0$minute" ;; esac
+case "$second" in ?) second="0$second" ;; esac
+
+out_file="${prefix}_${year}${month}${day}_${hour}${minute}${second}.${suffix}"
+case "$out_folder" in
+    /) output="/$out_file" ;;
+    *) output="$out_folder/$out_file" ;;
+esac
+
+echo_pwd="$(pwd -P)"
+case "$input" in
+    "$echo_pwd"/*) set -- Input "${input#${echo_pwd}/}" ;;
+                *) set -- Input "$input" ;;
+esac
+case "$output" in
+    "$echo_pwd"/*) set -- "$@" Output "${output#${echo_pwd}/}" ;;
+                *) set -- "$@" Output "$output" ;;
+esac
+case "${echo_start+X}${echo_end+Y}" in
+    XY) set -- "$@" Trim "$echo_start -> $echo_end" ;;
+    X) set -- "$@" Trim "$echo_start -> END" ;;
+    Y) set -- "$@" Trim "START -> $echo_end" ;;
+esac
+
+printf "\n"; printf "%8s - %s\n" "$@"; printf "\n"
+case "${assume_yes+X}" in
+    X)
+        ;;
+    *)
+        printf "Do you want to run command? [Y/n]: "
+        read -r user_reply
+        case "$user_reply" in ''|[Yy]|[Yy][Ee][Ss]) ;; *) exit 0 ;; esac
+        ;;
+esac
+
+exec ffmpeg -loglevel warning -stats ${rotate-} -i "$input" -codec copy \
+    -map_metadata -1 -async 1 ${start-} ${end-} ${assume_yes-} "$output"
