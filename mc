@@ -9,14 +9,17 @@ quit () {
     exit "$1"
 }
 
-PATH="/usr/bin"
+PATH="/usr/bin:/bin"
 
-unset -v display
+unset -v option
+unset -v argument
 unset -v operation
+
 while getopts ":hd:bvm" option; do
     case "$option" in
         h) usage 0 ;;
-        d) display="$OPTARG" ;;
+        B) option=B argument="$OPTARG" ;;
+        D) option=D argument="$OPTARG" ;;
         b) operation=brightness ;;
         v) operation=volume ;;
         m) operation=mute ;;
@@ -39,14 +42,24 @@ case "$operation" in
     mute) code=0x8d ;;
 esac
 
-case "${display+X}" in
-    X)
+case "${option-}" in
+    B)
         [ "$primary" = setvcp ] && set -x
-        ddcutil -d "$display" "$primary" "$code" "$@"
+        ddcutil -b "$argument" "$primary" "$code" "$@"
+        ;;
+    D)
+        [ "$primary" = setvcp ] && set -x
+        ddcutil -d "$argument" "$primary" "$code" "$@"
         ;;
     *)
-        [ "$primary" = setvcp ] && set -x
-        ddcutil -d 1 "$primary" "$code" "$@"
-        ddcutil -d 2 "$primary" "$code" "$@"
+        set -e
+        _ddcutil=$(ddcutil detect)
+        _ddcutil=$(printf "%s\n" "$_ddcutil" | grep '^.*I2C.*i2c-[0-9]\{1,\}$')
+        _ddcutil=$(printf "%s\n" "$_ddcutil" | sed -n 's|^.*i2c-\([0-9]\{1,\}\)$|\1|p')
+        _ddcutil=$(printf 'ddcutil -b %d "$primary" "$code" "$@";\n' $_ddcutil)
+        _ddcutil=$(printf '[ "$primary" = setvcp ] && set -x;\n%s' "$_ddcutil")
+        set +e
+
+        eval $_ddcutil
         ;;
 esac
