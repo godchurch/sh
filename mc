@@ -9,7 +9,7 @@ quit () {
     exit "$1"
 }
 
-PATH="/usr/bin:/bin"
+PATH="/usr/bin"
 
 unset -v option
 unset -v argument
@@ -52,13 +52,17 @@ case "${option-}" in
         ddcutil -d "$argument" "$primary" "$code" "$@"
         ;;
     *)
+        GREP='^[[:blank:]]+I2C bus:[[:blank:]]+/dev/i2c-[0-9]+$'
+        SED='s|^.*-([0-9]+)$|ddcutil -b \1 "$primary" "$code" "$@";|'
+
         set -e
-        _ddcutil=$(ddcutil detect)
-        _ddcutil=$(printf "%s\n" "$_ddcutil" | grep '^.*I2C.*i2c-[0-9]\{1,\}$')
-        _ddcutil=$(printf "%s\n" "$_ddcutil" | sed -n 's|^.*i2c-\([0-9]\{1,\}\)$|\1|p')
-        _ddcutil=$(printf 'ddcutil -b %d "$primary" "$code" "$@";\n' $_ddcutil)
-        _ddcutil=$(printf '[ "$primary" = setvcp ] && set -x;\n%s' "$_ddcutil")
+        _ddcutil="$(ddcutil detect)"
+        _ddcutil="$(printf "%s\n" "$_ddcutil" | grep -E "$GREP")"
+        _ddcutil="$(printf "%s\n" "$_ddcutil" | sed -E "$SED")"
         set +e
+
+        [ "$primary" = setvcp ] && _ddcutil="set -x;
+$_ddcutil"
 
         eval $_ddcutil
         ;;
