@@ -14,7 +14,7 @@ shift $#
 while read -r package description; do
     [ -z "$package" ] || set -- "$@" "$package"
 done << PACKAGES
-    neovim    # Heavily refactored vim fork
+    vim       # Vi IMproved - enhanced vi editor
     tmux      # Terminal multiplexer
     git       # Fast, scalable, distributed revision control system
     make      # Utility for directing compilation
@@ -36,6 +36,7 @@ done << PACKAGES
 
     imagemagick          # Image manipulation programs -- binaries
 
+    vim-gtk3       # Vi IMproved - enhanced vi editor - with GTK3 GUI
     mpv            # Video player based on MPlayer/mplayer2
     keepassxc      # Cross Platform Password Manager
     gimp           # GNU Image Manipulation Program
