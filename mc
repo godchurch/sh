@@ -1,7 +1,7 @@
 #!/usr/bin/sh
 
 usage () {
-    printf "%s\n" "Usage: ${0##*/} [-h] -b|-v|-m [-d display] [arguments]" >&2
+    printf "%s\n" "Usage: ${0##*/} [-h] -b|-v|-m [arguments]" >&2
     exit "$1"
 }
 quit () {
@@ -15,11 +15,9 @@ unset -v option
 unset -v argument
 unset -v operation
 
-while getopts ":hd:bvm" option; do
+while getopts ":hbvm" option; do
     case "$option" in
         h) usage 0 ;;
-        B) option=B argument="$OPTARG" ;;
-        D) option=D argument="$OPTARG" ;;
         b) operation=brightness ;;
         v) operation=volume ;;
         m) operation=mute ;;
@@ -42,28 +40,16 @@ case "$operation" in
     mute) code=0x8d ;;
 esac
 
-case "${option-}" in
-    B)
-        [ "$primary" = setvcp ] && set -x
-        ddcutil -b "$argument" "$primary" "$code" "$@"
-        ;;
-    D)
-        [ "$primary" = setvcp ] && set -x
-        ddcutil -d "$argument" "$primary" "$code" "$@"
-        ;;
-    *)
-        GREP='^[[:blank:]]+I2C bus:[[:blank:]]+/dev/i2c-[0-9]+$'
-        SED='s|^.*-([0-9]+)$|ddcutil -b \1 "$primary" "$code" "$@";|'
+GREP='^[[:blank:]]+I2C bus:[[:blank:]]+/dev/i2c-[0-9]+$'
+SED='s|^.*-([0-9]+)$|ddcutil -b \1 "$primary" "$code" "$@";|'
 
-        set -e
-        _ddcutil="$(ddcutil detect)"
-        _ddcutil="$(printf "%s\n" "$_ddcutil" | grep -E "$GREP")"
-        _ddcutil="$(printf "%s\n" "$_ddcutil" | sed -E "$SED")"
-        set +e
+set -e
+_ddcutil="$(ddcutil detect)"
+_ddcutil="$(printf "%s\n" "$_ddcutil" | grep -E "$GREP")"
+_ddcutil="$(printf "%s\n" "$_ddcutil" | sed -E "$SED")"
+set +e
 
-        [ "$primary" = setvcp ] && _ddcutil="set -x;
+[ "$primary" = setvcp ] && _ddcutil="set -x;
 $_ddcutil"
 
-        eval $_ddcutil
-        ;;
-esac
+eval $_ddcutil
