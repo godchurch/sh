@@ -32,6 +32,7 @@ done << PACKAGES
     libvirt-daemon    # Virtualization daemon
     libvirt-clients   # Programs for the libvirt library
     bridge-utils      # Utilities for configuring the Linux Ethernet bridge
+    virtiofsd         # Virtio-fs vhost-user device daemon
     virt-manager      # Desktop application for managing virtual machines
 
     imagemagick          # Image manipulation programs -- binaries
