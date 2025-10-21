@@ -2,45 +2,25 @@
 
 set -e
 
-PATH="$(command -p getconf PATH)"
-
-id="$(id -u)"
-if [ "$id" -ne 0 ]; then
-    printf "%s: permission denied\n" "${0##*/}" >&2
-    exit 1
-fi
-
 shift $#
-while read -r package description; do
-    [ -z "$package" ] || set -- "$@" "$package"
-done << PACKAGES
-    vim       # Vi IMproved - enhanced vi editor
-    tmux      # Terminal multiplexer
-    git       # Fast, scalable, distributed revision control system
-    make      # Utility for directing compilation
-    m4        # Macro processing language
-    ffmpeg    # Tools for transcoding, streaming and playing of multimedia files
-    curl      # Command line tool for transferring data with URL syntax
-    aria2     # High speed download utility
 
-    p7zip         # 7zr file archiver with high compression ratio
-    p7zip-full    # 7z and 7za file archivers with high compression ratio
-    p7zip-rar     # Non-free rar module for p7zip
-    unar          # Unarchiver for a variety of file formats
-
-    qemu-system-x86   # QEMU full system emulation binaries (x86)
-    libvirt-daemon    # Virtualization daemon
-    libvirt-clients   # Programs for the libvirt library
-    bridge-utils      # Utilities for configuring the Linux Ethernet bridge
-    virtiofsd         # Virtio-fs vhost-user device daemon
-    virt-manager      # Desktop application for managing virtual machines
-
-    imagemagick          # Image manipulation programs -- binaries
-
-    vim-gtk3       # Vi IMproved - enhanced vi editor - with GTK3 GUI
-    mpv            # Video player based on MPlayer/mplayer2
-    keepassxc      # Cross Platform Password Manager
-    gimp           # GNU Image Manipulation Program
-PACKAGES
+set -- "$@" "tmux"               # Terminal multiplexer
+set -- "$@" "vim"                # Vi IMproved - enhanced vi editor
+set -- "$@" "vim-gui-common"     # Vi IMproved - enhanced vi editor - common gui files
+set -- "$@" "git"                # Fast, scalable, distributed revision control system
+set -- "$@" "make"               # Utility for directing compilation
+set -- "$@" "curl"               # Command line tool for transferring data with URL syntax
+set -- "$@" "aria2"              # High speed download utility
+set -- "$@" "7zip"               # 7-Zip file archiver with a high compression ratio
+set -- "$@" "7zip-rar"           # RAR plugin for 7-Zip
+set -- "$@" "ffmpeg"             # Tools for transcoding, streaming and playing of multimedia files
+set -- "$@" "qemu-system-x86"    # QEMU full system emulation binaries (x86)
+set -- "$@" "virtiofsd"          # Virtio-fs vhost-user device daemon
+set -- "$@" "virt-manager"       # Desktop application for managing virtual machines
+set -- "$@" "imagemagick"        # Image manipulation programs -- binaries
+set -- "$@" "keepassxc-minimal"  # Cross Platform Password Manager
+set -- "$@" "mpv"                # Video player based on MPlayer/mplayer2
+set -- "$@" "picard"             # Next-Generation MusicBrainz audio files tagger
+set -- "$@" "gimp"               # GNU Image Manipulation Program
 
 exec apt-get -y install "$@"
